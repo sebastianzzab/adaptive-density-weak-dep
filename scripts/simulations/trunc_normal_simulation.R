@@ -10,7 +10,7 @@ library(truncnorm)
 # Estableciendo semilla para reproducibilidad
 set.seed(1234)
 
-nsim <- 1000
+nsim <- 10000
 U <- runif(nsim)
 # U = pnorm(Z, mean = 0, sd = 1) # caso dependiente
 
@@ -48,7 +48,6 @@ legend("topright", legend = c("Simulado (Hist)", "Teorico (Funcion)"),
 # H_0: Los datos siguen una distribucion Normal Truncada (-c,c)
 ks.test(x, "ptruncnorm", a = -2, b = 2, mean = 0, sd = 1)
 
-
 # Prueba de Ljung-Box (independencia)
 #------------------------------------------------------
 # H_0: Los datos son independientes (ruido blanco)
@@ -60,3 +59,85 @@ plot(x[-length(x)], x[-1], xlab = "X_t", ylab = "X_t+1")
 # Correlacion
 cor(x[-length(x)], x[-1]) # -0.03698361
 
+gnormtrunc <- function(nsim, a, b, m, de) {
+  # Generar variables uniformes
+  U <- runif(nsim) 
+  # Calcular probabilidades acumuladas en los límites a y b con los parámetros dados
+  F_a <- pnorm(a, mean = m, sd = de)
+  F_b <- pnorm(b, mean = m, sd = de)
+  # Diferencia de probabilidades (área truncada)
+  p <- F_b - F_a
+  # Inversa de la función de distribución (qnorm) ajustada a la escala
+  x <- qnorm(p * U + F_a, mean = m, sd = de) 
+  return(x)
+}
+
+# =====================================================================
+# CASO 1: Normal Estándar truncada en el centro [-1, 1]
+# =====================================================================
+a1 <- -1; b1 <- 1; m1 <- 0; de1 <- 1
+x1 <- gnormtrunc(nsim = 10000, a = a1, b = b1, m = m1, de = de1)
+
+# Histograma simulado
+hist(x1, breaks = 50, col = "lightblue", prob = TRUE, border = "white",
+     main = "Simulación vs Teoría: N(0,1) en [-1, 1]", xlab = "Valor")
+
+# Curva teórica
+curve(dtruncnorm(x, a = a1, b = b1, mean = m1, sd = de1), 
+      col = "darkred", lwd = 2, add = TRUE)
+
+# Leyenda
+legend("topright", legend = c("Simulado (Hist)", "Teórico (Función)"), 
+       col = c("lightblue", "darkred"), lwd = 2, bty = "n", fill=c("lightblue", NA), border=c("black", NA))
+
+ks.test(x1, "ptruncnorm", a = a1, b = b1, mean = m1, sd = de1) # p-value = 0.2087
+
+# =====================================================================
+# CASO 2: Normal Personalizada truncada N(100, 15) en [85, 130]
+# =====================================================================
+a2 <- 85; b2 <- 130; m2 <- 100; de2 <- 15
+x2 <- gnormtrunc(nsim = 10000, a = a2, b = b2, m = m2, de = de2)
+
+# Histograma simulado
+hist(x2, breaks = 50, col = "lightblue", prob = TRUE, border = "white",
+     main = "Simulación vs Teoría: N(100,15) en [85, 130]", xlab = "Valor")
+
+# Curva teórica
+curve(dtruncnorm(x, a = a2, b = b2, mean = m2, sd = de2), 
+      col = "darkred", lwd = 2, add = TRUE)
+
+# Leyenda
+legend("topright", legend = c("Simulado (Hist)", "Teórico (Función)"), 
+       col = c("lightblue", "darkred"), lwd = 2, bty = "n", fill=c("lightblue", NA), border=c("black", NA))
+
+ks.test(x2, "ptruncnorm", a = a2, b = b2, mean = m2, sd = de2) # p-value = 0.5771
+# =====================================================================
+# CASO 3: Extremo (Cola Derecha) N(0, 1) en [2, 5]
+# =====================================================================
+a3 <- 2; b3 <- 5; m3 <- 0; de3 <- 1
+x3 <- gnormtrunc(nsim = 10000, a = a3, b = b3, m = m3, de = de3)
+
+# Histograma simulado
+hist(x3, breaks = 50, col = "lightblue", prob = TRUE, border = "white",
+     main = "Simulación vs Teoría: N(0,1) en [2, 5]", xlab = "Valor")
+
+# Curva teórica
+curve(dtruncnorm(x, a = a3, b = b3, mean = m3, sd = de3), 
+      col = "darkred", lwd = 2, add = TRUE)
+
+# Leyenda
+legend("topright", legend = c("Simulado (Hist)", "Teórico (Función)"), 
+       col = c("lightblue", "darkred"), lwd = 2, bty = "n", fill=c("lightblue", NA), border=c("black", NA))
+
+ks.test(x3, "ptruncnorm", a = a3, b = b3, mean = m3, sd = de3) # p-value = 0.5641
+
+
+# Determinar que g(x) es una f.d valida
+# g(x) es la f.d de una normal(0,1) truncada en (0,1)
+g.x <- function(x, a0, b0) {
+  p <- pnorm(b0) - pnorm(a0)
+  ifelse(x < a0 | x > b0, 0, dnorm(x)) / p
+}
+
+a <- integrate(f = g.x, lower = 0, upper = 1, a0 = 0, b0 = 1)$value
+a # 1
