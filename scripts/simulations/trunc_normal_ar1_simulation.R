@@ -19,6 +19,9 @@
 # Instala el paquete si no lo tienes: install.packages("truncnorm")
 library(truncnorm)
 
+# Esteblciendo semilla inicial
+set.seed(1234)
+
 # ==============================================================================
 # 2. FUNCIÓN DE SIMULACIÓN (Normal Truncada Dependiente AR(1))
 # ==============================================================================
@@ -141,8 +144,65 @@ diagnostico_error_local <- function(X, a, b, m, de, titulo = "") {
 # 5. EJECUCIÓN DE SIMULACIONES Y GRÁFICOS DE COMPARACIÓN
 # ==============================================================================
 
-# [Tus bloques de simulación originales se mantienen intactos. 
-# A modo de ejemplo, te muestro cómo aplicar la nueva función al final del Bloque 3.]
+# ------------------------------------------------------------------------------
+# Bloque 1: Simulaciones con phi = 0 y normal truncada (0,1) en (-2,2)
+# ------------------------------------------------------------------------------
+
+X11 <- gnormtrunc_dep(nsim = 200, phi= 0, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11")
+graficar_densidades_trunc(X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X11, a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200, phi=0)")
+
+X12 <- gnormtrunc_dep(nsim = 500, phi= 0, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X12, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X12")
+graficar_densidades_trunc(X12, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X12")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X12, a = -2, b = 2, m = 0, de = 1, titulo = "X12 (n=500, phi=0)")
+
+X13 <- gnormtrunc_dep(nsim = 1000, phi= 0, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X13, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X13")
+graficar_densidades_trunc(X13, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X13")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X13, a = -2, b = 2, m = 0, de = 1, titulo = "X13 (n=1000, phi=0)")
+
+X14 <- gnormtrunc_dep(nsim = 2000, phi= 0, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X14, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X14")
+graficar_densidades_trunc(X14, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X14")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X14, a = -2, b = 2, m = 0, de = 1, titulo = "X12 (n=2000, phi=0)")
+
+# ------------------------------------------------------------------------------
+# Bloque 2: Simulaciones con phi = 0.5 y normal truncada (0,1) en (-2,2)
+# ------------------------------------------------------------------------------
+X21 <- gnormtrunc_dep(nsim = 200, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X21, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X21")
+graficar_densidades_trunc(X21, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X21")
+diagnostico_error_local(X21, a = -2, b = 2, m = 0, de = 1, titulo = "X21 (n=500, phi=0.5)")
+
+X22 <- gnormtrunc_dep(nsim = 500, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X22, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X22")
+graficar_densidades_trunc(X22, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X22")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X22, a = -2, b = 2, m = 0, de = 1, titulo = "X22 (n=500, phi=0.5)")
+
+X23 <- gnormtrunc_dep(nsim = 1000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X23, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X23")
+graficar_densidades_trunc(X23, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X23")
+diagnostico_error_local(X23, a = -2, b = 2, m = 0, de = 1, titulo = "X23 (n=500, phi=0.5)")
+
+X24 <- gnormtrunc_dep(nsim = 2000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+par(mfrow=c(1,2))
+graficar_densidades_trunc(X24, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X24")
+graficar_densidades_trunc(X24, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X24")
+diagnostico_error_local(X24, a = -2, b = 2, m = 0, de = 1, titulo = "X24 (n=500, phi=0.5)")
 
 # ------------------------------------------------------------------------------
 # Bloque 3: Simulaciones con phi = 0.9 y normal truncada (0,1) en (-2,2)
@@ -151,88 +211,90 @@ X31 <- gnormtrunc_dep(nsim = 200, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
 par(mfrow=c(1,2))
 graficar_densidades_trunc(X31, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X31")
 graficar_densidades_trunc(X31, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X31")
+diagnostico_error_local(X31, a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200, phi=0.9)")
 
 X32 <- gnormtrunc_dep(nsim = 500, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
 par(mfrow=c(1,2))
 graficar_densidades_trunc(X32, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X32")
 graficar_densidades_trunc(X32, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X32")
+diagnostico_error_local(X32, a = -2, b = 2, m = 0, de = 1, titulo = "X32 (n=500, phi=0.9)")
 
 X33 <- gnormtrunc_dep(nsim = 1000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
 par(mfrow=c(1,2))
 graficar_densidades_trunc(X33, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X33")
 graficar_densidades_trunc(X33, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X33")
+# Aviso: In bw.ucv(x) : minimum occurred at one end of the range
+diagnostico_error_local(X33, a = -2, b = 2, m = 0, de = 1, titulo = "X33 (n=1000, phi=0.9)")
 
 X34 <- gnormtrunc_dep(nsim = 2000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
 par(mfrow=c(1,2))
 graficar_densidades_trunc(X34, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X34")
 graficar_densidades_trunc(X34, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X34")
+diagnostico_error_local(X34, a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000, phi=0.9)")
 
-# >>> Aplicación de la herramienta de diagnóstico visual a la muestra X34 <<<
-diagnostico_error_local(X31, a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000, phi=0.9)")
-
-# # Simulaciones con phi = 0 y normal truncada (0,1) en (-2,2)
-
-X11 <- gnormtrunc_dep(nsim = 200, phi= 0, a = -2, b = 2, m = 0, de = 1)
-
-# Estimaciones
-dsilX11 <- density(X11, bw = "nrd0"); plot(dsilX11);
-dcvX11 <- density(X11, bw = "ucv"); plot(dcvX11)
-
-X12 <- gnormtrunc_dep(nsim = 500, phi= 0, a = -2, b = 2, m = 0, de = 1)
-
-# Estimaciones
-dsilX12 <- density(X12, bw = "nrd0"); plot(dsilX12)
-dcvX12 <- density(X12, bw = "ucv"); plot(dcvX12)
-
-X13 <- gnormtrunc_dep(nsim = 1000, phi= 0, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX13 <- density(X13, bw = "nrd0"); plot(dsilX13)
-dcvX13 <- density(X13, bw = "ucv"); plot(dcvX13)
-
-X14 <- gnormtrunc_dep(nsim = 2000, phi= 0, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX14 <- density(X14, bw = "nrd0"); plot(dsilX14)
-dcvX14 <- density(X14, bw = "ucv"); plot(dcvX14)
-
-# Simulaciones con phi = 0.5 y normal truncada (0,1) en (-2,2)
-X21 <- gnormtrunc_dep(nsim = 200, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX21 <- density(X21, bw = "nrd0"); plot(dsilX21)
-dcvX21 <- density(X21, bw = "ucv"); plot(dcvX21)
-
-X22 <- gnormtrunc_dep(nsim = 500, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX22 <- density(X22, bw = "nrd0"); plot(dsilX22)
-dcvX22 <- density(X22, bw = "ucv"); plot(dcvX22)
-
-X23 <- gnormtrunc_dep(nsim = 1000, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX23 <- density(X23, bw = "nrd0"); plot(dsilX23)
-dcvX23 <- density(X23, bw = "ucv"); plot(dcvX23)
-
-X24 <- gnormtrunc_dep(nsim = 2000, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX24 <- density(X24, bw = "nrd0"); plot(dsilX24)
-dcvX24 <- density(X24, bw = "ucv"); plot(dcvX24)
-
-# Simulaciones con phi = 0.9 y normal truncada (0,1) en (-2,2)
-
-X31 <- gnormtrunc_dep(nsim = 200, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX31 <- density(X31, bw = "nrd0"); plot(dsilX31)
-dcvX31 <- density(X31, bw = "ucv"); plot(dcvX31)
-
-X32 <- gnormtrunc_dep(nsim = 500, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX32 <- density(X32, bw = "nrd0"); plot(dsilX32)
-dcvX32 <- density(X32, bw = "ucv"); plot(dcvX32)
-
-X33 <- gnormtrunc_dep(nsim = 1000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX33 <- density(X33, bw = "nrd0"); plot(dsilX33)
-dcvX33 <- density(X33, bw = "ucv"); plot(dcvX33)
-
-X34 <- gnormtrunc_dep(nsim = 2000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
-# Estimaciones
-dsilX34 <- density(X34, bw = "nrd0"); plot(dsilX34)
-dcvX34 <- density(X34, bw = "ucv"); plot(dcvX34)
+# # # Simulaciones con phi = 0 y normal truncada (0,1) en (-2,2)
+# 
+# X11 <- gnormtrunc_dep(nsim = 200, phi= 0, a = -2, b = 2, m = 0, de = 1)
+# 
+# # Estimaciones
+# dsilX11 <- density(X11, bw = "nrd0"); plot(dsilX11);
+# dcvX11 <- density(X11, bw = "ucv"); plot(dcvX11)
+# 
+# X12 <- gnormtrunc_dep(nsim = 500, phi= 0, a = -2, b = 2, m = 0, de = 1)
+# 
+# # Estimaciones
+# dsilX12 <- density(X12, bw = "nrd0"); plot(dsilX12)
+# dcvX12 <- density(X12, bw = "ucv"); plot(dcvX12)
+# 
+# X13 <- gnormtrunc_dep(nsim = 1000, phi= 0, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX13 <- density(X13, bw = "nrd0"); plot(dsilX13)
+# dcvX13 <- density(X13, bw = "ucv"); plot(dcvX13)
+# 
+# X14 <- gnormtrunc_dep(nsim = 2000, phi= 0, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX14 <- density(X14, bw = "nrd0"); plot(dsilX14)
+# dcvX14 <- density(X14, bw = "ucv"); plot(dcvX14)
+# 
+# # Simulaciones con phi = 0.5 y normal truncada (0,1) en (-2,2)
+# X21 <- gnormtrunc_dep(nsim = 200, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX21 <- density(X21, bw = "nrd0"); plot(dsilX21)
+# dcvX21 <- density(X21, bw = "ucv"); plot(dcvX21)
+# 
+# X22 <- gnormtrunc_dep(nsim = 500, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX22 <- density(X22, bw = "nrd0"); plot(dsilX22)
+# dcvX22 <- density(X22, bw = "ucv"); plot(dcvX22)
+# 
+# X23 <- gnormtrunc_dep(nsim = 1000, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX23 <- density(X23, bw = "nrd0"); plot(dsilX23)
+# dcvX23 <- density(X23, bw = "ucv"); plot(dcvX23)
+# 
+# X24 <- gnormtrunc_dep(nsim = 2000, phi= 0.5, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX24 <- density(X24, bw = "nrd0"); plot(dsilX24)
+# dcvX24 <- density(X24, bw = "ucv"); plot(dcvX24)
+# 
+# # Simulaciones con phi = 0.9 y normal truncada (0,1) en (-2,2)
+# 
+# X31 <- gnormtrunc_dep(nsim = 200, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX31 <- density(X31, bw = "nrd0"); plot(dsilX31)
+# dcvX31 <- density(X31, bw = "ucv"); plot(dcvX31)
+# 
+# X32 <- gnormtrunc_dep(nsim = 500, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX32 <- density(X32, bw = "nrd0"); plot(dsilX32)
+# dcvX32 <- density(X32, bw = "ucv"); plot(dcvX32)
+# 
+# X33 <- gnormtrunc_dep(nsim = 1000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX33 <- density(X33, bw = "nrd0"); plot(dsilX33)
+# dcvX33 <- density(X33, bw = "ucv"); plot(dcvX33)
+# 
+# X34 <- gnormtrunc_dep(nsim = 2000, phi= 0.9, a = -2, b = 2, m = 0, de = 1)
+# # Estimaciones
+# dsilX34 <- density(X34, bw = "nrd0"); plot(dsilX34)
+# dcvX34 <- density(X34, bw = "ucv"); plot(dcvX34)
