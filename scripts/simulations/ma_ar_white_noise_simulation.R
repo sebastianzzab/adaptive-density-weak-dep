@@ -44,7 +44,7 @@ n= 500
 media_ar1 <- 0.58 / (1 - 0.25)
 sim_ar1 <- arima.sim(n = 500, model = list(ar = 0.25), sd = 0.10) + media_ar1
 plot.ts(sim_ar1, col = "darkgreen", main = "AR(1): phi = 0.25")
-acf(sim_ar1, main = "ACF - AR(1) [0.25]", lag=100)
+acf(sim_ar1, main = "ACF - AR(1) [0.25]", lag=100, lwd=2)
 #pacf(sim_ar1, main = "#pacf - AR(1) [0.25]")
 plot(seq(1, n, 1), sim_ar1, xlab="", ylab="") # Diagrama de dispersion de los
 # datos generados {X_i}_{i=1}^n
@@ -53,14 +53,14 @@ plot(seq(1, n, 1), sim_ar1, xlab="", ylab="") # Diagrama de dispersion de los
 media_ar2 <- 0.58 / (1 - 0.65)
 sim_ar2 <- arima.sim(n = 500, model = list(ar = 0.65), sd = 0.10) + media_ar2
 plot.ts(sim_ar2, col = "darkgreen", main = "AR(1): phi = 0.65")
-acf(sim_ar2, main = "ACF - AR(1) [0.65]", lag=100)
+acf(sim_ar2, main = "ACF - AR(1) [0.65]", lag=100, lwd=2)
 #pacf(sim_ar2, main = "#pacf - AR(1) [0.65]")
 
 # Ejemplo 3: AR(1) con phi = 0.95
 media_ar3 <- 0.58 / (1 - 0.95)
 sim_ar3 <- arima.sim(n = 500, model = list(ar = 0.95), sd = 0.10) + media_ar3
 plot.ts(sim_ar3, col = "darkred", main = "AR(1): phi = 0.95")
-acf(sim_ar3, main = "ACF - AR(1) [0.95]", lag=100)
+acf(sim_ar3, main = "ACF - AR(1) [0.95]", lag=100, lwd=2)
 #pacf(sim_ar3, main = "#pacf - AR(1) [0.95]")
 
 # # Seleccionando h bajo distintos métodos
