@@ -1,12 +1,20 @@
 ---
 title: "Análisis Exploratorio - Capítulo 4"
 author: "Borrador de Resultados"
-date: "`r Sys.Date()`"
-output: 
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
   html_document:
+    theme: flatly
     toc: true
     toc_depth: 3
-    theme: flatly
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    code_download: true
+    df_print: paged
+    highlight: tango
 ---
 
 ```{r setup, include=FALSE}
@@ -42,12 +50,14 @@ gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
   # Inversa de la función de distribución (qnorm) ajustada a la escala
   X = qnorm(p * U + F_a, mean=m, sd=de)
   
-  par(mfrow=c(1,3))
-  # Gráficos internos solicitados de la serie
-  plot(seq(1, nsim, 1), X, xlab="Índice", ylab="X", main=paste("Dispersión (phi =", phi, ", n =", nsim, ")"))
-  plot(X, type = "l", xlab="Índice", ylab="X", main="Gráfico de Líneas")
-  acf(X, main=paste("ACF para phi =", phi))
-  par(mfrow=c(1,1))
+  
+  # SE COMENTA ESTA PARTE PORQUE NO APORTA NADA
+  # par(mfrow=c(1,3))
+  # # Gráficos internos solicitados de la serie
+  # plot(seq(1, nsim, 1), X, xlab="Índice", ylab="X", main=paste("Dispersión (phi =", phi, ", n =", nsim, ")"))
+  # plot(X, type = "l", xlab="Índice", ylab="X", main="Gráfico de Líneas")
+  # acf(X, main=paste("ACF para phi =", phi))
+  # par(mfrow=c(1,1))
   
   return(X)
 }
@@ -167,7 +177,8 @@ diagnostico_error_local <- function(X, a, b, m, de, lim_inf, lim_sup, titulo = "
 
 ## Generación de los procesos estocásticos AR(1) y verificación de las condiciones de dependencia débil para $\phi \in \{0, 0.5, 0.9\}$
 
-A continuacion se muestran los graficos de tres procesos estocásticos AR(1) simulados mediante el comando arima.sim() de R considerando $\phi$ bajo cada uno de los tres niveles de dependencia establecidos:
+A continuación para observar la calidad del proceso de generación propuesto en el esquema de simulación previo se muestran los gráficos de tres procesos estocásticos AR(1), los cuales fueron simulados mediante el comando `arima.sim()`  de R considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
+
 ```{r acf_verificacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia."}
 # Generamos una muestra de n=1000 para ilustrar los tres escenarios de dependencia
 par(mfrow=c(1,3))
@@ -182,9 +193,12 @@ acf(Z_fuerte, main="ACF Dependencia Fuerte (phi = 0.9)")
 par(mfrow=c(1,1))
 ```
 
-Se puede observar que segun sea el nivel de dependencia ($\phi$) el decaimiento del ACF es mas o menos pronunciado. En el primer caso ($\phi=0$), se observa que ese decaimiento es rapido, sin rezagos estadisticamente significativos y comportandose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$),el decaimiento es mas lento, se identifica que los primeros rezagos son estadisticamente significos. Por ultimo, se observa que el decaimiento es el mas lento de los tres y se observa una dependencia fuerte entre los primeros rezagos, siendo estadisticamente significativos.
+Se puede observar que según sea el nivel de dependencia ($\phi$) el decaimiento del ACF es mas o menos pronunciado. En el primer caso ($\phi=0$), se observa que ese decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es mas lento, se identifica que los primeros rezagos son estadísticamente significativos. Por ultimo, se observa que para $\phi=0.9$ su decaimiento es el mas lento de los tres, teniendo una dependencia fuerte entre los primeros rezagos, siendo estadísticamente significativos. 
 
 ## Desempeño de los estimadores bajo el supuesto de independencia ($\phi = 0$) para distintos tamaños muestrales ($n \in \{200, 500, 1000, 2000\}$)
+
+
+
 
 ```{r indep_200_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de independencia (n=200, phi=0)."}
 # --- Análisis para n=200 ---
@@ -201,11 +215,13 @@ graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, ti
 par(mfrow=c(1,1))
 ```
 
+Los dos métodos clásicos estiman ventanas similares, cuya diferencia es de a penas 0.0138. No distan mucho de la densidad real.
+
 ```{r indep_200_errores, echo=FALSE, warning=FALSE, message=FALSE,fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200)."}
 diagnostico_error_local(X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
 ```
 
-####################################################################################################################################################################################
+
 ```{r indep_500_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=500, phi=0)."}
 # --- Análisis para n=500, phi=0 ---
 X12 <- gnormtrunc_dep(nsim = 500, phi = 0, a = -2, b = 2, m = 0, de = 1)
@@ -227,7 +243,7 @@ diagnostico_error_local(X12, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup
 
 ```
 
-####################################################################################################################################################################################
+
 ```{r indep_1000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=1000, phi=0)."}
 # --- Análisis para n=1000, phi=0 ---
 X13 <- gnormtrunc_dep(nsim = 1000, phi = 0, a = -2, b = 2, m = 0, de = 1)
@@ -248,7 +264,7 @@ par(mfrow=c(1,1))
 diagnostico_error_local(X13, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X13 (n=1000, phi=0)")
 
 ```
-####################################################################################################################################################################################
+
 
 ```{r indep_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=2000, phi=0)."}
 # --- Análisis para n=2000, phi=0 ---
@@ -293,7 +309,7 @@ par(mfrow=c(1,1))
 diagnostico_error_local(X21, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X21 (n=200, phi=0.5)")
 ```
 
-####################################################################################################################################################################################
+
 ```{r moder_500_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=500, phi=0.5)."}
 # --- Análisis para n=500, phi=0.5 ---
 X22 <- gnormtrunc_dep(nsim = 500, phi = 0.5, a = -2, b = 2, m = 0, de = 1)
@@ -315,7 +331,7 @@ diagnostico_error_local(X22, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup
 
 ```
 
-####################################################################################################################################################################################
+
 ```{r moder_1000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=1000, phi=0.5)."}
 # --- Análisis para n=1000, phi=0.5 ---
 X23 <- gnormtrunc_dep(nsim = 1000, phi = 0.5, a = -2, b = 2, m = 0, de = 1)
@@ -336,7 +352,7 @@ par(mfrow=c(1,1))
 diagnostico_error_local(X23, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X23 (n=1000, phi=0.5)")
 
 ```
-####################################################################################################################################################################################
+
 
 ```{r moder_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=2000, phi=0.5)."}
 # --- Análisis para n=2000, phi=0.5 ---
@@ -382,7 +398,7 @@ diagnostico_error_local(X31, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup
 
 ```
 
-####################################################################################################################################################################################
+
 ```{r fuerte_500_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=500, phi=0.9)."}
 # --- Análisis para n=500, phi=0.9 ---
 X32 <- gnormtrunc_dep(nsim = 500, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
@@ -404,7 +420,7 @@ diagnostico_error_local(X32, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup
 
 ```
 
-####################################################################################################################################################################################
+
 ```{r fuerte_1000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=1000, phi=0.9)."}
 # --- Análisis para n=1000, phi=0.9 ---
 X33 <- gnormtrunc_dep(nsim = 1000, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
@@ -425,7 +441,7 @@ par(mfrow=c(1,1))
 diagnostico_error_local(X33, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X33 (n=1000, phi=0.9)")
 
 ```
-####################################################################################################################################################################################
+
 
 ```{r fuerte_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Trayectoria, dispersión y función de autocorrelación empírica del proceso estocástico simulado bajo el supuesto de dependencia fuerte (n=2000, phi=0.9)."}
 # --- Análisis para n=2000, phi=0.9 ---

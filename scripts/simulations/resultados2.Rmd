@@ -1,0 +1,488 @@
+---
+title: "Análisis Exploratorio - Capítulo 4"
+author: "Borrador de Resultados"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    code_download: true
+    df_print: paged
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+# Configuración global de los chunks
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, 
+                      fig.align = 'center', fig.width = 10, fig.height = 6)
+
+library(truncnorm)
+library(doParallel)
+library(foreach)
+library(truncnorm)
+library(ggplot2)
+library(dplyr)
+# set.seed(1234)
+
+# ==============================================================================
+# FUNCIÓN DE SIMULACIÓN (Normal Truncada Dependiente AR(1))
+# ==============================================================================
+gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
+  # Generacion de AR(1)
+  if (phi == 0) {
+    Z <- rnorm(nsim) # Si phi es 0, es simplemente ruido blanco estandar
+  } else {
+    Z <- arima.sim(list(ar=phi), n=nsim) 
+  }
+  
+  # Calculamos la varianza teórica del proceso AR(1)
+  sd_Z <- if (phi == 0) 1 else sqrt(1 / (1 - phi^2))
+  
+  # Generar variables uniformes
+  U <- pnorm(Z, mean=0, sd=sd_Z)
+  
+  # Soporte para la normal truncada, dependiente.
+  F_a <- pnorm(a, mean = m, sd = de)
+  F_b <- pnorm(b, mean = m, sd = de)
+  p <- F_b - F_a
+  
+  # Inversa de la función de distribución (qnorm) ajustada a la escala
+  X = qnorm(p * U + F_a, mean=m, sd=de)
+  
+  return(X)
+}
+
+# ==============================================================================
+# FUNCIÓN PARA ESTIMAR LA DENSIDAD
+# ==============================================================================
+
+est_dens_func <- function(X, bw_metodo, lim_inf, lim_sup) {
+  
+  # 1. Calcular estimación de densidad kernel
+  # Nota: Es buena práctica fijar 'n' (ej. n = 512) para asegurar el mismo tamaño siempre
+  est_dens <- density(X, bw = bw_metodo, from = lim_inf, to = lim_sup, n = 512)
+  
+  # 2. Extraer el valor numérico de h (ancho de banda) redondeado a 4 decimales
+  h_estimado <- round(est_dens$bw, 4)
+  
+  # 3. Extraer la malla con la que se construyó la estimación
+  malla <- est_dens$x
+  
+  # 4. Extraer las estimaciones de la densidad de la malla
+  densidades <- est_dens$y
+  
+  # 5. Retornar las variables en una lista con nombres descriptivos
+  return(list(
+    h_estimado = h_estimado,
+    malla      = malla,
+    densidades = densidades
+  ))
+}
+
+# ==============================================================================
+# FUNCIÓN ASISTENTE PARA SOBREPONER DENSIDADES
+# ==============================================================================
+graficar_densidades_trunc <- function(densidad_est, bw_metodo, a, b, m, de, titulo = "") {
+  
+  # 1. Extraer los límites dinámicamente desde la malla ya calculada
+  limite_inferior <- min(densidad_est$malla)
+  limite_superior <- max(densidad_est$malla)
+  
+  # 2. Graficar la estimación del Kernel usando los vectores x e y
+  plot(x = densidad_est$malla, 
+       y = densidad_est$densidades, 
+       type = "l", 
+       main = paste("Densidad", titulo, "[", bw_metodo, "]"), 
+       sub = paste("Ancho de banda estimado (h) =", round(densidad_est$h_estimado, 4)),
+       col = "blue", lwd = 2, 
+       xlim = c(limite_inferior, limite_superior), # Límites inyectados automáticamente
+       ylim = c(0, max(densidad_est$densidades) * 1.2),
+       xlab = "Valores de X", ylab = "Densidad")
+  
+  # 3. Sobreponer la teórica usando el paquete truncnorm
+  curve(dtruncnorm(x, a = a, b = b, mean = m, sd = de), 
+        col = "darkred", lwd = 3, lty = 3, add = TRUE)
+  
+  # 4. Leyenda explicativa enriquecida con el valor de h
+  legend("topright", 
+         legend = c(paste("Kernel (h =", round(densidad_est$h_estimado, 4), ")"), "Teórica (truncnorm)"), 
+         col = c("blue", "darkred"), lty = c(1, 2), lwd = 2, bty = "n")
+}
+
+
+
+# ==============================================================================
+# FUNCIÓN DE DIAGNÓSTICO DE ERROR LOCAL (SESGO Y ERROR CUADRÁTICO) (ACTUALIZADO)
+# ==============================================================================
+diagnostico_error_local <- function(X, a, b, m, de, lim_inf, lim_sup, titulo = "") {
+  # Configurar layout para 2 gráficos apilados verticalmente
+  par(mfrow = c(2, 1), mar = c(4, 4, 3, 1))
+  
+  # 1. Estimar con ambos métodos forzando la grilla exacta (sin interpolación)
+  # Usamos from, to y n=512 para "congelar" la malla
+  d_nrd0 <- density(X, bw = "nrd0", from = lim_inf, to = lim_sup, n = 512)
+  
+  # Suprimimos los warnings de UCV para no saturar la consola en esta fase
+  d_ucv  <- suppressWarnings(density(X, bw = "ucv", from = lim_inf, to = lim_sup, n = 512))
+  
+  # 2. Extraer la malla exacta generada por R y evaluar la densidad teórica ahí
+  x_grid <- d_nrd0$x
+  y_teo <- dtruncnorm(x_grid, a = a, b = b, mean = m, sd = de)
+  
+  # 3. GRÁFICO 1: Residuos (Sesgo Local)
+  # Calculamos el error directamente sin usar approx()
+  sesgo_nrd0 <- d_nrd0$y - y_teo
+  sesgo_ucv  <- d_ucv$y - y_teo
+  
+  # Establecer límites simétricos para el eje Y del sesgo
+  y_lim_sesgo <- max(abs(c(sesgo_nrd0, sesgo_ucv)))
+  
+  plot(x_grid, sesgo_nrd0, type = "l", col = "blue", lwd = 2,
+       ylim = c(-y_lim_sesgo, y_lim_sesgo),
+       ylab = "Residuo (Est - Teo)", xlab = "x",
+       main = paste("Sesgo Local (Análisis de Bordes):", titulo))
+  lines(x_grid, sesgo_ucv, col = "darkorange", lwd = 2, lty = 2)
+  abline(h = 0, col = "darkgray", lty = 1) # Línea de perfección
+  abline(v = c(a, b), col = "red", lty = 3) # Límites de truncamiento
+  
+  legend("topright", legend = c("Sesgo nrd0", "Sesgo ucv", "Límites (a,b)"),
+         col = c("blue", "darkorange", "red"), lty = c(1, 2, 3), lwd = 2, bty = "n")
+  
+  # 4. GRÁFICO 2: Error Cuadrático Local
+  se_nrd0 <- sesgo_nrd0^2
+  se_ucv  <- sesgo_ucv^2
+  
+  plot(x_grid, se_nrd0, type = "l", col = "blue", lwd = 2,
+       ylab = "Error Cuadrático", xlab = "x",
+       main = paste("Penalización de Error Cuadrático (SE):", titulo))
+  lines(x_grid, se_ucv, col = "darkorange", lwd = 2, lty = 2)
+  abline(v = c(a, b), col = "red", lty = 3)
+  
+  # Restaurar layout gráfico a la normalidad
+  par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+}
+
+```
+
+# Resultados del Estudio de Simulación
+
+## Generación de los procesos estocásticos AR(1) y verificación de las condiciones de dependencia débil
+
+A continuación, para observar la calidad del proceso de generación propuesto en el esquema de simulación previo, se muestran los gráficos de tres procesos estocásticos AR(1). Estos fueron simulados mediante el comando `arima.sim()` de R, considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
+
+```{r acf_verificacion, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia."}
+# Generamos una muestra de n=1000 para ilustrar los tres escenarios de dependencia
+par(mfrow=c(1,3))
+Z_indep <- arima.sim(list(ar=0), n=1000)
+acf(Z_indep, main="ACF Independencia (phi = 0)")
+
+Z_mod   <- arima.sim(list(ar=0.5), n=1000)
+acf(Z_mod, main="ACF Dependencia Moderada (phi = 0.5)")
+
+Z_fuerte <- arima.sim(list(ar=0.9), n=1000)
+acf(Z_fuerte, main="ACF Dependencia Fuerte (phi = 0.9)")
+par(mfrow=c(1,1))
+
+```
+
+Se puede observar que según sea el nivel de dependencia ($\phi$) el decaimiento del ACF es más o menos pronunciado. En el primer caso ($\phi=0$), se observa que ese decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, se observa que para $\phi=0.9$ su decaimiento es el más lento de los tres, teniendo una dependencia fuerte entre los primeros rezagos, siendo estadísticamente significativos.
+
+Para evaluar la calidad de los tres métodos se empezara estudiando su comportamiento bajo los siguientes casos:
+Caso A: Independencia (phi=0) con n=200.
+Caso B: Independencia (phi=0) con n=2000.
+Caso C: Dependencia fuerte (phi=0.9) con n=200.
+Caso D: Dependencia fuerte (phi=0.9) con n=2000.
+
+
+## Casos de Estudio: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+
+### Caso A: Muestra pequeña ($n=200$)
+
+```{r indep_200_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(1234)
+X11 <- gnormtrunc_dep(nsim = 200, phi = 0, a = -2, b = 2, m = 0, de = 1)
+dens_nrd0_X11 <- est_dens_func(X11, "nrd0", lim_inf = -3, lim_sup = 3)
+dens_ucv_X11  <- suppressWarnings(est_dens_func(X11, "ucv", lim_inf = -3, lim_sup = 3))
+
+```
+
+```{r indep_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0)."}
+par(mfrow=c(1,2))
+graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
+graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
+par(mfrow=c(1,1))
+
+```
+
+Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica.
+
+```{r indep_200_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0)."}
+diagnostico_error_local(X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
+
+```
+
+No se observan grandes diferencias entre las estimaciones de cada uno de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla.
+
+### Caso B: Comportamiento asintótico ($n=2000$)
+
+```{r indep_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(4321)
+X14 <- gnormtrunc_dep(nsim = 2000, phi = 0, a = -2, b = 2, m = 0, de = 1)
+dens_nrd0_X14 <- est_dens_func(X14, "nrd0", lim_inf = -3, lim_sup = 3)
+dens_ucv_X14  <- suppressWarnings(est_dens_func(X14, "ucv", lim_inf = -3, lim_sup = 3))
+
+```
+
+```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
+par(mfrow=c(1,2))
+graficar_densidades_trunc(dens_nrd0_X14, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
+graficar_densidades_trunc(dens_ucv_X14, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
+par(mfrow=c(1,1))
+
+```
+
+Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta.
+
+```{r indep_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0)."}
+diagnostico_error_local(X14, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X14 (n=2000, phi=0)")
+
+```
+
+Se aprecian diferencias mas pequeñas entre las estimaciones de cada uno de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla.
+
+## Casos de Estudio: Comportamiento en Fronteras bajo Dependencia Fuerte ($\phi = 0.9$)
+
+### Caso C: Muestra pequeña ($n=200$)
+
+```{r fuerte_200_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(9876)
+X31 <- gnormtrunc_dep(nsim = 200, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
+dens_nrd0_X31 <- est_dens_func(X31, "nrd0", lim_inf = -3, lim_sup = 3)
+dens_ucv_X31  <- suppressWarnings(est_dens_func(X31, "ucv", lim_inf = -3, lim_sup = 3))
+
+```
+
+```{r fuerte_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0.9)."}
+par(mfrow=c(1,2))
+graficar_densidades_trunc(dens_nrd0_X31, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
+graficar_densidades_trunc(dens_ucv_X31, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
+par(mfrow=c(1,1))
+
+```
+
+En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva. 
+
+```{r fuerte_200_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0.9)."}
+diagnostico_error_local(X31, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X31 (n=200, phi=0.9)")
+
+```
+
+Se observan mayores diferencias que en los casos anteriores.
+
+### Caso D: Comportamiento asintótico ($n=2000$)
+
+```{r fuerte_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+set.seed(5678)
+X34 <- gnormtrunc_dep(nsim = 2000, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
+dens_nrd0_X34 <- est_dens_func(X34, "nrd0", lim_inf = -3, lim_sup = 3)
+dens_ucv_X34  <- suppressWarnings(est_dens_func(X34, "ucv", lim_inf = -3, lim_sup = 3))
+
+```
+
+```{r fuerte_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0.9)."}
+par(mfrow=c(1,2))
+graficar_densidades_trunc(dens_nrd0_X34, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
+graficar_densidades_trunc(dens_ucv_X34, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
+par(mfrow=c(1,1))
+
+```
+
+```{r fuerte_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0.9)."}
+diagnostico_error_local(X34, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X34 (n=2000, phi=0.9)")
+
+```
+
+
+```{r}
+# ==============================================================================
+# 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
+# ==============================================================================
+n_vals <- c(200, 500, 1000, 2000)
+phi_vals <- c(0, 0.5, 0.9)
+M <- 1000
+
+# Parámetros fijos de la distribución truncada y la malla de estimación
+a_t <- -2
+b_t <- 2
+m_t <- 0
+de_t <- 1
+
+# Parámetros estrictos de la malla (Garantizan comparabilidad)
+lim_inf <- -3
+lim_sup <- 3
+n_grid <- 512
+
+# Pre-asignar un data.frame vacío para guardar el resumen final
+resultados_mise <- data.frame(
+  n = integer(),
+  phi = numeric(),
+  metodo = character(),
+  mise = numeric()
+)
+
+
+# Pre-asignar un data.frame vacío para TODOS los errores (serán 24,000 filas)
+resultados_completos <- data.frame(
+  n = factor(),
+  phi = factor(),
+  metodo = character(),
+  eci = numeric()
+)
+
+# ==============================================================================
+# 2. CONFIGURACIÓN DEL CLÚSTER PARALELO
+# ==============================================================================
+# Detectar núcleos disponibles dejando uno libre para la estabilidad del sistema
+num_cores <- max(1, parallel::detectCores() - 1)
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+# ==============================================================================
+# 3. BUCLE PRINCIPAL (MONTE CARLO PARALELIZADO)
+# ==============================================================================
+# Fijamos una sola semilla global inicial para todo el experimento
+set.seed(999) 
+
+for (phi in phi_vals) {
+  for (n in n_vals) {
+    
+    # foreach divide las M iteraciones entre los núcleos de forma simultánea
+    errores_mc <- foreach(m = 1:M, .combine = 'rbind', .packages = c("truncnorm", "stats")) %dopar% {
+      
+      # 1. Generar la muestra estocástica
+      X <- gnormtrunc_dep(nsim = n, phi = phi, a = a_t, b = b_t, m = m_t, de = de_t)
+      
+      # 2. Estimaciones clásicas forzando la malla estricta [-3, 3] con 512 puntos
+      d_nrd0 <- density(X, bw = "nrd0", from = lim_inf, to = lim_sup, n = n_grid)
+      
+      # tryCatch previene que validación cruzada aborte todo el script si no converge
+      d_ucv <- tryCatch({
+        suppressWarnings(density(X, bw = "ucv", from = lim_inf, to = lim_sup, n = n_grid))
+      }, error = function(e) {
+        # Si ucv falla por ruido excesivo en la muestra, retorna nrd0 para esa réplica
+        return(d_nrd0) 
+      })
+      
+      # 3. Extraer la malla exacta (idéntica en cada iteración) y evaluar la densidad teórica
+      x_grid <- d_nrd0$x
+      y_teo <- dtruncnorm(x_grid, a = a_t, b = b_t, mean = m_t, sd = de_t)
+      
+      # 4. Calcular el Error Cuadrático Integrado (ECI) 
+      # Se usa la aproximación geométrica (suma de Riemann) sobre la malla
+      delta_x <- x_grid[2] - x_grid[1]
+      eci_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
+      eci_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
+      
+      # Retornar los errores de esta iteración específica
+      c(eci_nrd0, eci_ucv)
+    }
+    
+    # 5. Calcular el MISE promediando los ECI de las M réplicas
+    mise_nrd0 <- mean(errores_mc[, 1])
+    mise_ucv  <- mean(errores_mc[, 2])
+    
+    # 6. Guardar los resultados del MISE
+    resultados_mise <- rbind(resultados_mise, 
+                             data.frame(n = n, phi = phi, metodo = "Silverman (nrd0)", mise = mise_nrd0),
+                             data.frame(n = n, phi = phi, metodo = "UCV", mise = mise_ucv))
+    
+    # -------------------------------------------------------------------------
+    # 7. NUEVO: Guardar TODOS los ECI individuales en lugar de solo el promedio
+    # Esto va ADENTRO del bucle de "n"
+    # -------------------------------------------------------------------------
+    
+    # Creamos un data.frame temporal para Silverman
+    df_nrd0 <- data.frame(
+      n = as.factor(n), 
+      phi = paste("Dependencia (phi) =", phi), 
+      metodo = "Silverman", 
+      eci = errores_mc[, 1]
+    )
+    
+    # Creamos un data.frame temporal para UCV
+    df_ucv <- data.frame(
+      n = as.factor(n), 
+      phi = paste("Dependencia (phi) =", phi), 
+      metodo = "UCV", 
+      eci = errores_mc[, 2]
+    )
+    
+    # Unimos al data.frame maestro
+    resultados_completos <- rbind(resultados_completos, df_nrd0, df_ucv)
+    
+  } # Cierra el bucle de "n"
+} # Cierra el bucle de "phi"
+
+# Detener el clúster paralelo para liberar recursos del procesador
+stopCluster(cl)
+
+# ==============================================================================
+# 4. PRESENTACIÓN DE RESULTADOS
+# ==============================================================================
+# Renombrar columnas para la salida académica
+colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
+
+# Generar la tabla limpia en HTML/PDF
+knitr::kable(resultados_mise, digits = 6, align = "c", 
+             caption = "Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.")
+
+```
+
+```{r}
+# Gráfico de Cajas Comparativo
+grafico_cajas <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 1, outlier.alpha = 0.5) +
+  facet_wrap(~ phi, scales = "free_y", ncol = 1) + 
+  scale_fill_manual(values = c("Silverman" = "#2c3e50", "UCV" = "#e74c3c")) +
+  labs(
+    title = "Distribución del Error Cuadrático Integrado (ECI) por Tamaño Muestral",
+    subtitle = "Comparativa entre Silverman y UCV bajo distintos niveles de dependencia AR(1)",
+    x = "Tamaño Muestral (n)",
+    y = "Error Cuadrático Integrado (ECI)",
+    fill = "Selector:"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    strip.text = element_text(size = 12, face = "bold"),
+    strip.background = element_rect(fill = "#ecf0f1", color = NA)
+  )
+
+print(grafico_cajas)
+```
+
+```{r}
+# Gráfico de Violín
+grafico_violin <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)) +
+  geom_violin(alpha = 0.6, trim = FALSE, scale = "width") +
+  facet_wrap(~ phi, scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c("Silverman" = "#2980b9", "UCV" = "#d35400")) +
+  labs(
+    title = "Densidad Empírica de los Errores de Estimación",
+    subtitle = "Visualización de las colas pesadas en la varianza estocástica de los selectores",
+    x = "Tamaño Muestral (n)",
+    y = "Densidad del Error (ECI)",
+    fill = "Selector:"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+print(grafico_violin)
+```
+
