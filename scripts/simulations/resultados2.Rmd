@@ -29,7 +29,20 @@ library(truncnorm)
 library(ggplot2)
 library(dplyr)
 library(kableExtra)
+library(nor1mix)
+library(parallel) # # Si se desea usar computación en paralelo para acelerar uniroot en simulaciones
 # set.seed(1234)
+
+# =====================================================================
+# Configuración de las Densidades de Marron & Wand
+# =====================================================================
+# El paquete nor1mix provee objetos predefinidos MW.nm1 hasta MW.nm15.
+# Almacenamos estas funciones en una lista para facilitar el acceso por índice.
+  mw_list <- list(
+    MW.nm1,  MW.nm2,  MW.nm3,  MW.nm4,  MW.nm5,
+    MW.nm6,  MW.nm7,  MW.nm8,  MW.nm9,  MW.nm10,
+    MW.nm11, MW.nm12, MW.nm13, MW.nm14, MW.nm15
+)
 
 # ==============================================================================
 # FUNCIÓN DE SIMULACIÓN (Normal Truncada Dependiente AR(1))
@@ -57,6 +70,35 @@ gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
   X = qnorm(p * U + F_a, mean=m, sd=de)
   
   return(X)
+}
+
+# =====================================================================
+# Función Generadora mediante Transformada Inversa Numérica
+# =====================================================================
+# Dado que la distribución empírica en nor1mix no está truncada,
+# ampliamos el intervalo de búsqueda a valores seguros (ej. -15 a 15).
+generar_dependiente_mw <- function(nsim, phi, m, de, mw_obj, limite = c(-15,15)) {
+  # Generacion de AR(1)
+  if (phi == 0) {
+    Z <- rnorm(nsim) # Si phi es 0, es simplemente ruido blanco estandar
+  } else {
+    Z <- arima.sim(list(ar=phi), n=nsim) 
+  }
+  
+  # Calculamos la varianza teórica del proceso AR(1)
+  sd_Z <- if (phi == 0) 1 else sqrt(1 / (1 - phi^2))
+  
+  # Generar variables uniformes
+  U <- pnorm(Z, mean=0, sd=sd_Z)
+  
+  # Usamos mclapply (o sapply) para optimizar el cálculo de raíces en vectores largos.
+  # El método uniroot invierte la función pnorMix (CDF de la mezcla).
+  Y_list <- lapply(U, function(u) {
+    res <- uniroot(function(x) pnorMix(x, mw_obj) - u, interval = limite)
+    return(res$root)
+  })
+  
+  return(unlist(Y_list))
 }
 
 # ==============================================================================
@@ -116,10 +158,8 @@ graficar_densidades_trunc <- function(densidad_est, bw_metodo, a, b, m, de, titu
          col = c("blue", "darkred"), lty = c(1, 2), lwd = 2, bty = "n")
 }
 
-
-
 # ==============================================================================
-# FUNCIÓN DE DIAGNÓSTICO DE ERROR LOCAL (SESGO Y ERROR CUADRÁTICO)
+# FUNCIÓN DE DIAGNÓSTICO DE ERROR LOCAL (ERROR CUADRÁTICO)
 # ==============================================================================
 diagnostico_error_local <- function(X, a, b, m, de, lim_inf, lim_sup, titulo = "") {
   # Configurar layout para 2 gráficos apilados verticalmente
@@ -575,6 +615,8 @@ print(grafico_cajas)
 <div align="justify">
 Se observan que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.  
 </div>
+
+
 
 ```{r eval=FALSE, include=FALSE}
 # Gráfico de Violín
