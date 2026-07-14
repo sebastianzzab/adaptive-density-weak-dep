@@ -1,6 +1,6 @@
 ---
-title: "Análisis Exploratorio - Capítulo 4"
-author: "Borrador de Resultados"
+title: "Presentación y Análisis de Resultados"
+author: "Sebastian Zabala"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
   html_document:
@@ -21,7 +21,6 @@ output:
 # Configuración global de los chunks
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, 
                       fig.align = 'center', fig.width = 10, fig.height = 6)
-
 library(truncnorm)
 library(doParallel)
 library(foreach)
@@ -30,69 +29,57 @@ library(ggplot2)
 library(dplyr)
 library(kableExtra)
 library(nor1mix)
-library(parallel) # # Si se desea usar computación en paralelo para acelerar uniroot en simulaciones
-# set.seed(1234)
+library(parallel) # Si se desea usar computación en paralelo para acelerar uniroot en simulaciones
 
 # =====================================================================
 # Configuración de las Densidades de Marron & Wand
 # =====================================================================
 # El paquete nor1mix provee objetos predefinidos MW.nm1 hasta MW.nm15.
 # Almacenamos estas funciones en una lista para facilitar el acceso por índice.
-  mw_list <- list(
-    MW.nm1,  MW.nm2,  MW.nm3,  MW.nm4,  MW.nm5,
-    MW.nm6,  MW.nm7,  MW.nm8,  MW.nm9,  MW.nm10,
-    MW.nm11, MW.nm12, MW.nm13, MW.nm14, MW.nm15
+mw_list <- list(
+  MW.nm1,  MW.nm2,  MW.nm3,  MW.nm4,  MW.nm5,
+  MW.nm6,  MW.nm7,  MW.nm8,  MW.nm9,  MW.nm10,
+  MW.nm11, MW.nm12, MW.nm13, MW.nm14, MW.nm15
 )
 
 # ==============================================================================
-# FUNCIÓN DE SIMULACIÓN (Normal Truncada Dependiente AR(1))
+# FUNCION PARA GENERAR VARIABLES UNIFORMES DEPENDIENTES
 # ==============================================================================
-gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
-  # Generacion de AR(1)
+generar_uniformes_ar1 <- function(nsim, phi) {
+  # Generación del proceso AR(1)
   if (phi == 0) {
-    Z <- rnorm(nsim) # Si phi es 0, es simplemente ruido blanco estandar
+    Z <- rnorm(nsim)
   } else {
     Z <- arima.sim(list(ar=phi), n=nsim) 
   }
   
-  # Calculamos la varianza teórica del proceso AR(1)
+  # Cálculo de la varianza teórica
   sd_Z <- if (phi == 0) 1 else sqrt(1 / (1 - phi^2))
   
-  # Generar variables uniformes
-  U <- pnorm(Z, mean=0, sd=sd_Z)
+  # Retornar variables uniformes U
+  return(pnorm(Z, mean=0, sd=sd_Z))
+}
+
+
+# ===================================================================================================
+# FUNCIÓN GENERADORA VARIABLES CON NORMAL TRUNCADA DEPENDIENTE AR(1) MEDIANTE TRANSFORMADA INVERSA
+# ===================================================================================================
+gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
+  U <- generar_uniformes_ar1(nsim, phi)
   
-  # Soporte para la normal truncada, dependiente.
   F_a <- pnorm(a, mean = m, sd = de)
   F_b <- pnorm(b, mean = m, sd = de)
   p <- F_b - F_a
   
-  # Inversa de la función de distribución (qnorm) ajustada a la escala
-  X = qnorm(p * U + F_a, mean=m, sd=de)
-  
-  return(X)
+  return(qnorm(p * U + F_a, mean=m, sd=de))
 }
 
 # =====================================================================
-# Función Generadora mediante Transformada Inversa Numérica
+# FUNCIÓN GENERADORA MEDIANTE TRANSFORMADA INVERSA GENERALIZADA 
 # =====================================================================
-# Dado que la distribución empírica en nor1mix no está truncada,
-# ampliamos el intervalo de búsqueda a valores seguros (ej. -15 a 15).
-generar_dependiente_mw <- function(nsim, phi, m, de, mw_obj, limite = c(-15,15)) {
-  # Generacion de AR(1)
-  if (phi == 0) {
-    Z <- rnorm(nsim) # Si phi es 0, es simplemente ruido blanco estandar
-  } else {
-    Z <- arima.sim(list(ar=phi), n=nsim) 
-  }
+generar_dependiente_mw <- function(nsim, phi, mw_obj, limite = c(-15,15)) {
+  U <- generar_uniformes_ar1(nsim, phi)
   
-  # Calculamos la varianza teórica del proceso AR(1)
-  sd_Z <- if (phi == 0) 1 else sqrt(1 / (1 - phi^2))
-  
-  # Generar variables uniformes
-  U <- pnorm(Z, mean=0, sd=sd_Z)
-  
-  # Usamos mclapply (o sapply) para optimizar el cálculo de raíces en vectores largos.
-  # El método uniroot invierte la función pnorMix (CDF de la mezcla).
   Y_list <- lapply(U, function(u) {
     res <- uniroot(function(x) pnorMix(x, mw_obj) - u, interval = limite)
     return(res$root)
@@ -129,86 +116,171 @@ est_dens_func <- function(X, bw_metodo, lim_inf, lim_sup) {
 }
 
 # ==============================================================================
-# FUNCIÓN ASISTENTE PARA SOBREPONER DENSIDADES
+# FUNCIÓN ASISTENTE UNIFICADA PARA SOBREPONER DENSIDADES
 # ==============================================================================
-graficar_densidades_trunc <- function(densidad_est, bw_metodo, a, b, m, de, titulo = "") {
+graficar_densidades <- function(densidad_est, y_teo, bw_metodo, titulo = "", leyenda_teo = "Teórica") {
   
-  # 1. Extraer los límites dinámicamente desde la malla ya calculada
+  # 1. Extraer los límites dinámicamente desde la malla
   limite_inferior <- min(densidad_est$malla)
   limite_superior <- max(densidad_est$malla)
   
-  # 2. Graficar la estimación del Kernel usando los vectores x e y
+  # 2. Graficar la estimación del Kernel
   plot(x = densidad_est$malla, 
        y = densidad_est$densidades, 
        type = "l", 
        main = paste("Densidad", titulo, "[", bw_metodo, "]"), 
        sub = paste("Ancho de banda estimado (h) =", round(densidad_est$h_estimado, 4)),
        col = "blue", lwd = 2, 
-       xlim = c(limite_inferior, limite_superior), # Límites inyectados automáticamente
+       xlim = c(limite_inferior, limite_superior), 
        ylim = c(0, max(densidad_est$densidades) * 1.2),
        xlab = "Valores de X", ylab = "Densidad")
   
-  # 3. Sobreponer la teórica usando el paquete truncnorm
-  curve(dtruncnorm(x, a = a, b = b, mean = m, sd = de), 
-        col = "darkred", lwd = 3, lty = 3, add = TRUE)
+  # 3. Sobreponer la teórica usando el vector y_teo inyectado
+  lines(x = densidad_est$malla, y = y_teo, col = "darkred", lwd = 3, lty = 3)
   
-  # 4. Leyenda explicativa enriquecida con el valor de h
+  # 4. Leyenda explicativa dinámica
   legend("topright", 
-         legend = c(paste("Kernel (h =", round(densidad_est$h_estimado, 4), ")"), "Teórica (truncnorm)"), 
+         legend = c(paste("Kernel (h =", round(densidad_est$h_estimado, 4), ")"), leyenda_teo), 
          col = c("blue", "darkred"), lty = c(1, 2), lwd = 2, bty = "n")
 }
 
 # ==============================================================================
-# FUNCIÓN DE DIAGNÓSTICO DE ERROR LOCAL (ERROR CUADRÁTICO)
+# FUNCIÓN UNIFICADA DE DIAGNÓSTICO DE ERROR LOCAL (ERROR CUADRÁTICO)
 # ==============================================================================
-diagnostico_error_local <- function(X, a, b, m, de, lim_inf, lim_sup, titulo = "") {
-  # Configurar layout para 2 gráficos apilados verticalmente
-  # par(mfrow = c(2, 1), mar = c(4, 4, 3, 1))
+diagnostico_error_local <- function(X_nrd0, X_ucv, y_teo, lineas_verticales, titulo = "") {
   
-  # 1. Estimar con ambos métodos forzando la grilla exacta (sin interpolación)
-  # Usamos from, to y n=512 para "congelar" la malla
-  d_nrd0 <- density(X, bw = "nrd0", from = lim_inf, to = lim_sup, n = 512)
+  # 1. Extraer la malla exacta generada por R
+  x_grid <- X_nrd0$malla
   
-  # Suprimimos los warnings de UCV para no saturar la consola en esta fase
-  d_ucv  <- suppressWarnings(density(X, bw = "ucv", from = lim_inf, to = lim_sup, n = 512))
+  # 2. Calcular los residuos (Sesgo Local) directamente
+  sesgo_nrd0 <- X_nrd0$densidades - y_teo
+  sesgo_ucv  <- X_ucv$densidades - y_teo
   
-  # 2. Extraer la malla exacta generada por R y evaluar la densidad teórica ahí
-  x_grid <- d_nrd0$x
-  y_teo <- dtruncnorm(x_grid, a = a, b = b, mean = m, sd = de)
-  
-  # 3. GRÁFICO 1: Residuos (Sesgo Local)
-  # Calculamos el error directamente sin usar approx()
-  sesgo_nrd0 <- d_nrd0$y - y_teo
-  sesgo_ucv  <- d_ucv$y - y_teo
-  
-  # Establecer límites simétricos para el eje Y del sesgo
-  y_lim_sesgo <- max(abs(c(sesgo_nrd0, sesgo_ucv)))
-  
-  # plot(x_grid, sesgo_nrd0, type = "l", col = "blue", lwd = 2,
-  #      ylim = c(-y_lim_sesgo, y_lim_sesgo),
-  #      ylab = "Residuo (Est - Teo)", xlab = "x",
-  #      main = paste("Sesgo Local (Análisis de Bordes):", titulo))
-  # lines(x_grid, sesgo_ucv, col = "darkorange", lwd = 2, lty = 2)
-  # abline(h = 0, col = "darkgray", lty = 1) # Línea de perfección
-  # abline(v = c(a, b), col = "red", lty = 3) # Límites de truncamiento
-  # 
-  # legend("topright", legend = c("Sesgo nrd0", "Sesgo ucv", "Límites (a,b)"),
-  #        col = c("blue", "darkorange", "red"), lty = c(1, 2, 3), lwd = 2, bty = "n")
-  
-  # 4. GRÁFICO 2: Error Cuadrático Local
+  # 3. Calcular Error Cuadrático Local
   se_nrd0 <- sesgo_nrd0^2
   se_ucv  <- sesgo_ucv^2
   
+  # 4. GRÁFICO: Penalización de Error Cuadrático (SE)
   plot(x_grid, se_nrd0, type = "l", col = "blue", lwd = 2,
        ylab = "Error Cuadrático", xlab = "x",
        main = paste("Penalización de Error Cuadrático (SE):", titulo))
+       
   lines(x_grid, se_ucv, col = "darkorange", lwd = 2, lty = 2)
-  abline(v = c(a, b), col = "red", lty = 3)
-  legend("topright", legend = c("nrd0", "ucv", "Límites (a,b)"),
-         col = c("blue", "darkorange", "red"), lty = c(1, 2, 3), lwd = 2, bty = "n")
   
-  # Restaurar layout gráfico a la normalidad
-  par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+  # Agregar líneas verticales de fronteras dinámicamente
+  abline(v = lineas_verticales, col = "red", lty = 3)
+  
+  legend("topright", legend = c("nrd0", "ucv", "Fronteras"),
+         col = c("blue", "darkorange", "red"), lty = c(1, 2, 3), lwd = 2, bty = "n")
+}
+
+# ==============================================================================
+# FUNCIÓN ENVOLVENTE: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (NORMAL TRUNCADA)
+# ==============================================================================
+analizar_y_graficar_trunc <- function(n, phi, a, b, m, de, lim_inf, lim_sup, titulo_base) {
+  
+  # 1. Simular datos y estimar densidades empíricas
+  X_sim <- gnormtrunc_dep(nsim = n, phi = phi, a = a, b = b, m = m, de = de)
+  
+  dens_nrd0 <- est_dens_func(X_sim, "nrd0", lim_inf = lim_inf, lim_sup = lim_sup)
+  dens_ucv  <- suppressWarnings(est_dens_func(X_sim, "ucv", lim_inf = lim_inf, lim_sup = lim_sup))
+  
+  # 2. Calcular la curva teórica UNA SOLA VEZ usando dtruncnorm
+  x_grid <- dens_nrd0$malla
+  y_teorica <- dtruncnorm(x_grid, a = a, b = b, mean = m, sd = de)
+  
+  # 3. Título dinámico
+  titulo_grafico <- paste0(titulo_base, " (n=", n, ", phi=", phi, ")")
+  
+  # ============================================================================
+  # 4. CONFIGURACIÓN DEL DISEÑO GRÁFICO (LAYOUT)
+  # Matriz: Gráficos de densidades arriba, diagnóstico abajo
+  # ============================================================================
+  matriz_diseno <- matrix(c(1, 2, 
+                            3, 3), nrow = 2, byrow = TRUE)
+  layout(matriz_diseno)
+  
+  par(mar = c(4, 4, 3, 1) + 0.1)
+  
+  # 5. Generar gráficos de densidades superpuestas (Arriba)
+  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, "Teórica (truncnorm)")
+  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, "Teórica (truncnorm)")
+  
+  # 6. Generar gráfico de diagnóstico de error local (Abajo)
+  # Pasamos explícitamente c(a, b) para indicar las fronteras de truncamiento
+  diagnostico_error_local(X_nrd0 = dens_nrd0, 
+                          X_ucv = dens_ucv, 
+                          y_teo = y_teorica, 
+                          lineas_verticales = c(a, b), 
+                          titulo = titulo_grafico)
+  
+  # 7. Restaurar parámetros gráficos a la normalidad
+  layout(1)
+  par(mar = c(5, 4, 4, 2) + 0.1) 
+  
+  # 8. Retornar los datos silenciosamente
+  return(invisible(list(datos = X_sim, nrd0 = dens_nrd0, ucv = dens_ucv)))
+}
+
+# ===================================================================================
+# FUNCIÓN ENVOLVENTE: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (DENSIDADES DE MARRON & WAND)
+# ===================================================================================
+analizar_y_graficar_mw <- function(n, phi, mw_obj, lim_inf, lim_sup, lineas_diag, titulo_base) {
+  
+  # 1. Simular datos y estimar densidades empíricas
+  Y_sim <- generar_dependiente_mw(nsim = n, phi = phi, mw_obj = mw_obj)
+  dens_nrd0 <- est_dens_func(Y_sim, "nrd0", lim_inf = lim_inf, lim_sup = lim_sup)
+  dens_ucv  <- suppressWarnings(est_dens_func(Y_sim, "ucv", lim_inf = lim_inf, lim_sup = lim_sup))
+  
+  # 2. Calcular la curva teórica UNA SOLA VEZ
+  x_grid <- dens_nrd0$malla
+  y_teorica <- dnorMix(x_grid, mw_obj)
+  
+  # 3. Título dinámico
+  titulo_grafico <- paste0(titulo_base, " (n=", n, ", phi=", phi, ")")
+  
+  # ============================================================================
+  # 4. CONFIGURACIÓN DEL DISEÑO GRÁFICO (LAYOUT)
+  # Creamos una matriz: 
+  # [ 1, 2 ] -> Gráfico 1 (nrd0) y Gráfico 2 (ucv) arriba
+  # [ 3, 3 ] -> Gráfico 3 (Diagnóstico) abajo ocupando ambas columnas
+  # ============================================================================
+  matriz_diseno <- matrix(c(1, 2, 
+                            3, 3), nrow = 2, byrow = TRUE)
+  layout(matriz_diseno)
+  
+  # Ajustamos un poco los márgenes para que no se vea tan apretado
+  par(mar = c(4, 4, 3, 1) + 0.1)
+  
+  # 5. Generar gráficos de densidades superpuestas (Arriba)
+  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, "Teórica (nor1mix)")
+  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, "Teórica (nor1mix)")
+  
+  # 6. Generar gráfico de diagnóstico de error local (Abajo)
+  diagnostico_error_local(X_nrd0 = dens_nrd0, 
+                          X_ucv = dens_ucv, 
+                          y_teo = y_teorica, 
+                          lineas_verticales = lineas_diag, 
+                          titulo = titulo_grafico)
+  
+  # 7. Restaurar parámetros gráficos a la normalidad para futuros gráficos
+  layout(1)
+  par(mar = c(5, 4, 4, 2) + 0.1) 
+  
+  # 8. Retornar los datos silenciosamente
+  return(invisible(list(datos = Y_sim, nrd0 = dens_nrd0, ucv = dens_ucv)))
+}
+
+generar_tabla_apa <- function(dataframe, titulo_html) {
+  knitr::kable(dataframe, 
+               format = "html",
+               digits = 6, 
+               align = "c", 
+               booktabs = TRUE, 
+               escape = FALSE,  
+               caption = titulo_html) %>%
+    kable_classic(full_width = FALSE, html_font = "Times New Roman") %>%
+    row_spec(0, bold = TRUE)
 }
 
 ```
@@ -218,7 +290,7 @@ diagnostico_error_local <- function(X, a, b, m, de, lim_inf, lim_sup, titulo = "
 ## Generación de los procesos estocásticos AR(1) y verificación de las condiciones de dependencia débil
 
 <div align="justify">
-A continuación, para observar la calidad del proceso de generación propuesto en el esquema de simulación previo, se muestran los gráficos de tres procesos estocásticos AR(1). Estos fueron simulados mediante el comando `arima.sim()` de R, considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
+A continuación, para determinar la calidad del proceso de generación inicial propuesto en el esquema de simulación previo, se muestran los gráficos de tres procesos estocásticos AR(1). Estos fueron simulados mediante el comando `arima.sim()` de R, considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
 </div>
 
 ```{r acf_verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia.", message=FALSE, warning=FALSE}
@@ -238,138 +310,166 @@ par(mfrow=c(1,1))
 ```
 
 <div align="justify">
-Se puede observar que según sea el nivel de dependencia ($\phi$) el decaimiento del ACF es más o menos pronunciado. En el primer caso ($\phi=0$), se observa que ese decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, se observa que para $\phi=0.9$ su decaimiento es el más lento de los tres, teniendo una mayor cantidad de rezagos con dependencia, siendo estadísticamente significativos pero que al final esta va decayendo lentamente.
+Se puede apreciar que según sea el nivel de dependencia ($\phi$) el decaimiento del ACF es más o menos pronunciado. En el primer caso ($\phi=0$), su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, para $\phi=0.9$ se presenta que su decaimiento es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos.
 </div>
 
 <div align="justify">
-Garantizada la calidad de los procesos estocásticos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras de una distribución normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintotico y el efecto de la dependencia en las estimaciones de los métodos. La calidad de las estimaciones se evaluara mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3].
+Garantizada la calidad de los procesos estocásticos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras débilmente dependientes con distintas densidades marginales $f(x)$.
 </div>
 
-## Casos de Estudio: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+## Casos de Estudio de densidad normal truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+<div align="justify">
+En este apartado se generan muestras de una distribución normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos. La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
+</div>
 
 ### Caso A: Muestra pequeña ($n=200$)
 
-```{r indep_200_generacion, message=FALSE, warning=FALSE}
+```{r indep_200_generacion_X11}
 set.seed(1234)
-X11 <- gnormtrunc_dep(nsim = 200, phi = 0, a = -2, b = 2, m = 0, de = 1)
-dens_nrd0_X11 <- est_dens_func(X11, "nrd0", lim_inf = -3, lim_sup = 3)
-dens_ucv_X11  <- suppressWarnings(est_dens_func(X11, "ucv", lim_inf = -3, lim_sup = 3))
+resultados_X11 <- analizar_y_graficar_trunc(n = 200, 
+                                            phi = 0, 
+                                            a = -2, 
+                                            b = 2, 
+                                            m = 0, 
+                                            de = 1, 
+                                            lim_inf = -3, 
+                                            lim_sup = 3, 
+                                            titulo_base = "X11")
 
 ```
+
+<div align="justify">
+Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
+</div>
 
 ```{r indep_200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
-par(mfrow=c(1,2))
-graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
-graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
-par(mfrow=c(1,1))
+# par(mfrow=c(1,2))
+# graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
+# graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
+# par(mfrow=c(1,1))
 
 ```
 
-Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica. A continuación se muestran los errores cuadráticos de las estimaciones con los reales:
 
 ```{r indep_200_errores, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0)."}
-diagnostico_error_local(X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
+# diagnostico_error_local(X11, dens_nrd0_X11, dens_ucv_X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
 
 ```
 
-Se aprecia que el método de validación cruzada presenta errores cuadráticos más grandes que el método de Silverman para cada uno de los puntos de la malla.
 
 ### Caso B: Comportamiento asintótico ($n=2000$)
 
-```{r indep_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+```{r indep_2000_generacion_X12}
 set.seed(4321)
-X14 <- gnormtrunc_dep(nsim = 2000, phi = 0, a = -2, b = 2, m = 0, de = 1)
-dens_nrd0_X14 <- est_dens_func(X14, "nrd0", lim_inf = -3, lim_sup = 3)
-dens_ucv_X14  <- suppressWarnings(est_dens_func(X14, "ucv", lim_inf = -3, lim_sup = 3))
-
-```
-
-```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
-par(mfrow=c(1,2))
-graficar_densidades_trunc(dens_nrd0_X14, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
-graficar_densidades_trunc(dens_ucv_X14, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
-par(mfrow=c(1,1))
-
-```
-
-Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintotico.
-
-```{r indep_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0)."}
-diagnostico_error_local(X14, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X14 (n=2000, phi=0)")
-
+resultados_X12 <- analizar_y_graficar_trunc(n = 2000, 
+                                            phi = 0, 
+                                            a = -2, 
+                                            b = 2, 
+                                            m = 0, 
+                                            de = 1, 
+                                            lim_inf = -3, 
+                                            lim_sup = 3, 
+                                            titulo_base = "X12")
 ```
 
 <div align="justify">
-Se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia como a medida que $n$ aumenta estos métodos se vuelven mas precisos como lo muestra la teoría.  
+Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría. 
 </div>
 
-## Casos de Estudio: Comportamiento en Fronteras bajo Dependencia Fuerte ($\phi = 0.9$)
+```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
+# par(mfrow=c(1,2))
+# graficar_densidades_trunc(dens_nrd0_X14, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
+# graficar_densidades_trunc(dens_ucv_X14, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X14 (n=2000)")
+# par(mfrow=c(1,1))
+
+```
+
+
+```{r indep_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0)."}
+# diagnostico_error_local(X14, dens_nrd0_X14, dens_ucv_X14, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X14 (n=2000, phi=0)")
+
+```
+
+
+## Casos de Estudio de densidad normal truncada en [-2,2]: Comportamiento en Fronteras bajo Dependencia Fuerte ($\phi = 0.9$)
 
 ### Caso C: Muestra pequeña ($n=200$)
 
-```{r fuerte_200_generacion, echo=FALSE, warning=FALSE, message=FALSE}
+```{r fuerte_200_generacion_X13}
 set.seed(9876)
-X31 <- gnormtrunc_dep(nsim = 200, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
-dens_nrd0_X31 <- est_dens_func(X31, "nrd0", lim_inf = -3, lim_sup = 3)
-dens_ucv_X31  <- suppressWarnings(est_dens_func(X31, "ucv", lim_inf = -3, lim_sup = 3))
-
-```
-
-```{r fuerte_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0.9)."}
-par(mfrow=c(1,2))
-graficar_densidades_trunc(dens_nrd0_X31, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
-graficar_densidades_trunc(dens_ucv_X31, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
-par(mfrow=c(1,1))
-
-```
-
-En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva con ambos métodos. Esto evidencia que la dependencia débil impacta de manera negativa la eficiencia de los métodos de selección clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. 
-
-```{r fuerte_200_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0.9)."}
-diagnostico_error_local(X31, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X31 (n=200, phi=0.9)")
-
-```
-
-Se observan mayores errores cuadráticos que en los casos anteriores con la novedad de que ambos métodos producen resultados casi idénticos.  
-
-### Caso D: Comportamiento asintótico ($n=2000$)
-
-```{r fuerte_2000_generacion, echo=FALSE, warning=FALSE, message=FALSE}
-set.seed(5678)
-X34 <- gnormtrunc_dep(nsim = 2000, phi = 0.9, a = -2, b = 2, m = 0, de = 1)
-dens_nrd0_X34 <- est_dens_func(X34, "nrd0", lim_inf = -3, lim_sup = 3)
-dens_ucv_X34  <- suppressWarnings(est_dens_func(X34, "ucv", lim_inf = -3, lim_sup = 3))
-
-```
-
-```{r fuerte_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0.9)."}
-par(mfrow=c(1,2))
-graficar_densidades_trunc(dens_nrd0_X34, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
-graficar_densidades_trunc(dens_ucv_X34, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
-par(mfrow=c(1,1))
-
-```
-
-Ambos métodos producen estimaciones casi idénticas de la densidad, las cuales se aproximan a la densidad teórica. 
-
-```{r fuerte_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0.9)."}
-diagnostico_error_local(X34, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X34 (n=2000, phi=0.9)")
-
+resultados_X13 <- analizar_y_graficar_trunc(n = 200, 
+                                            phi = 0.9, 
+                                            a = -2, 
+                                            b = 2, 
+                                            m = 0, 
+                                            de = 1, 
+                                            lim_inf = -3, 
+                                            lim_sup = 3, 
+                                            titulo_base = "X13")
 ```
 
 <div align="justify">
-Se observa que ambos métodos producen errores cuadráticos pequeños. En ciertas regiones el método de Silverman produce errores más grandes que validación cruzada y viceversa. Esto muestra que para densidades de este tipo estos métodos producen, al menos para esta simulación, estimaciones bastante buenas conforme $n$ crece a pesar de $\phi=0.9$.  
+En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva con ambos métodos. Esto evidencia, al menos para esta muestra, que la dependencia débil impacta de manera negativa a la eficiencia de los métodos de selección clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. Por ello, se observan mayores errores cuadráticos que en los casos anteriores donde ambos métodos producen resultados similares. 
 </div>
 
-## Casos de estudio: Comportamiento de los métodos con $p=1000$ replicas 
+```{r fuerte_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0.9)."}
+# par(mfrow=c(1,2))
+# graficar_densidades_trunc(dens_nrd0_X31, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
+# graficar_densidades_trunc(dens_ucv_X31, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
+# par(mfrow=c(1,1))
+
+```
+
+```{r fuerte_200_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0.9)."}
+# diagnostico_error_local(X31, dens_nrd0_X31, dens_ucv_X31, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X31 (n=200, phi=0.9)")
+
+```
+
+### Caso D: Comportamiento asintótico ($n=2000$)
+
+```{r fuerte_2000_generacion_X14}
+set.seed(5678)
+resultados_X14 <- analizar_y_graficar_trunc(n = 2000, 
+                                            phi = 0.9, 
+                                            a = -2, 
+                                            b = 2, 
+                                            m = 0, 
+                                            de = 1, 
+                                            lim_inf = -3, 
+                                            lim_sup = 3, 
+                                            titulo_base = "X14")
+```
+
+<div align="justify">
+Ambos métodos producen estimaciones cercanas a la densidad teórica. Se aprecia que para ambos métodos se tienen errores cuadráticos pequeños, ligeramente mayores a los que se obtuvieron con el mismo $n$ y $\phi=0$. En ciertas regiones el método de Silverman produce errores más grandes que validación cruzada y viceversa. Esto muestra que para densidades de este tipo estos métodos producen, al menos para esta muestra, estimaciones bastante buenas conforme $n$ crece a pesar de $\phi=0.9$.
+</div>
+
+```{r fuerte_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0.9)."}
+# par(mfrow=c(1,2))
+# graficar_densidades_trunc(dens_nrd0_X34, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
+# graficar_densidades_trunc(dens_ucv_X34, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
+# par(mfrow=c(1,1))
+
+```
+
+```{r fuerte_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0.9)."}
+# diagnostico_error_local(X34, dens_nrd0_X34, dens_ucv_X34, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X34 (n=2000, phi=0.9)")
+
+```
+
+## Casos de estudio: Comportamiento de los métodos con $p=1000$ réplicas 
+
+<div align="justify">
+El análisis para una muestra no aporta evidencia suficiente sobre el desempeño promedio de cualquier estimador. En este caso, del estimador por núcleo bajo cada uno de los métodos de selección del ancho de ventana, nivel de dependencia y tamaño de muestra. Esto debido a que sus resultados pueden variar de muestra de a muestra y por escenario. Por esto, a continuación se muestran los resultados de estudios de simulación considerando una mayor cantidad de réplicas ($p>1$) para cada uno de los tres casos de $n$ y $\phi$ considerados en el esquema de simulación. Las estimaciones se realizan en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para las distintas densidades consideradas.
+</div>
 
 ### Comportamiento con la densidad normal estándar truncada en [-2,2].
 
 <div align="justify">
-El análisis para una muestra no aporta evidencia suficiente sobre el desempeño promedio de los métodos de selección, cuyos resultados pueden variar de muestra de la muestra. Por ello, a continuación se muestra una tabla con los errores obtenidos para $p=1000$ replicas para cada combinación de $n$ y $\phi$ en una malla de $n=512$ puntos igualmente espaciados en [-3,3]:
+A continuación se muestra una tabla con los errores obtenidos para $p=1000$ réplicas para cada combinación de $n$ y $\phi$ en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para una densidad normal estándar truncada en [-2,2]:
 </div>
 
-```{r}
+```{r simulacion_1000_densidad_normal_truncada}
 # ==============================================================================
 # 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
 # ==============================================================================
@@ -503,26 +603,31 @@ stopCluster(cl)
 #              caption = "Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.")
 
 # Renombrar columnas para la salida académica
+# colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
+# 
+# # Generar la tabla con estética APA para HTML
+# knitr::kable(resultados_mise, 
+#              format = "html",
+#              digits = 6, 
+#              align = "c", 
+#              booktabs = TRUE, # Regla clave para las líneas horizontales estilo APA
+#              escape = FALSE,  # Permite usar etiquetas HTML en el título
+#              caption = "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>") %>%
+#   kable_classic(full_width = FALSE, html_font = "Times New Roman") %>%
+#   row_spec(0, bold = TRUE) # Pone los nombres de las columnas en negrita
+
 colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
 
-# Generar la tabla con estética APA para HTML
-knitr::kable(resultados_mise, 
-             format = "html",
-             digits = 6, 
-             align = "c", 
-             booktabs = TRUE, # Regla clave para las líneas horizontales estilo APA
-             escape = FALSE,  # Permite usar etiquetas HTML en el título
-             caption = "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>") %>%
-  kable_classic(full_width = FALSE, html_font = "Times New Roman") %>%
-  row_spec(0, bold = TRUE) # Pone los nombres de las columnas en negrita
+titulo_tabla <- "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>"
+
+generar_tabla_apa(resultados_mise, titulo_tabla)
 ```
 
 <div align="justify">
-Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Por lo tanto, se tiene el siguiente gráfico:  
+Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Esto puede observarse en la siguiente figura:  
 </div>
 
 ```{r grafico_mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
-library(ggplot2)
 
 # Gráfico de Líneas y Puntos para el MISE usando los nombres de columnas actualizados
 grafico_mise <- ggplot(resultados_mise, aes(x = factor(`Tamaño Muestral (n)`), 
@@ -559,10 +664,12 @@ print(grafico_mise)
 ```
 
 <div align="justify">
-En la figura anterior, se aprecia como validación cruzada produce en promedio errores consistentemente mas grandes que el método de Silverman. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada. 
+En la figura anterior, se ve como validación cruzada produce en promedio errores consistentemente más grandes que el método de Silverman, esto puede deberse a que la ventana estimada con Silverman asume que la densidad es normal y regularidad ($\beta=2$), lo cual coincide con la densidad teórica que se quiere estimar en este caso. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada. 
 </div>
 
+<div align="justify">
 Para complementar lo anterior, se realiza un gráfico de cajas y bigotes para los errores cuadráticos integrados ($ECI$). 
+</div>
 
 ```{r grafico_cajas, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI)."}
 library(ggplot2)
@@ -613,10 +720,8 @@ print(grafico_cajas)
 ```
 
 <div align="justify">
-Se observan que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.  
+Se observa que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.  
 </div>
-
-
 
 ```{r eval=FALSE, include=FALSE}
 # Gráfico de Violín
@@ -636,5 +741,797 @@ grafico_violin <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo
 
 print(grafico_violin)
 ```
+
+
+```{r indep_200_generacion_XY21}
+resultados_Y21 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[2]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y21")
+```
+
+
+```{r indep_2000_generacion_XY22}
+resultados_Y22 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[2]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y22")
+```
+
+
+```{r}
+resultados_Y23 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[2]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y23")
+```
+
+```{r}
+resultados_Y24 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[2]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y24")
+```
+
+
+```{r indep_200_generacion_XY31}
+resultados_Y31 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[3]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y31")
+```
+
+```{r indep_200_generacion_XY32}
+resultados_Y32 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[3]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y32")
+```
+
+```{r}
+resultados_Y33 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[3]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y33")
+```
+
+```{r}
+resultados_Y34 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[3]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y34")
+```
+
+```{r}
+resultados_Y41 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[4]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y41")
+```
+
+```{r}
+resultados_Y42 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[4]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y42")
+```
+
+```{r}
+resultados_Y43 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[4]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y43")
+```
+
+```{r}
+resultados_Y44 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[4]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y44")
+```
+
+```{r}
+resultados_Y51 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[5]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y51")
+```
+
+```{r}
+resultados_Y52 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[5]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y52")
+```
+
+```{r}
+resultados_Y53 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[5]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y53")
+```
+
+```{r}
+resultados_Y54 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[5]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y54")
+```
+
+```{r}
+resultados_Y61 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[6]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y61")
+```
+
+```{r}
+resultados_Y62 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[6]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y62")
+```
+
+```{r}
+resultados_Y63 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[6]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y63")
+```
+
+```{r}
+resultados_Y64 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[6]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y64")
+```
+
+
+```{r}
+resultados_Y71 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[7]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y71")
+```
+
+```{r}
+resultados_Y72 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[7]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y72")
+```
+
+
+```{r}
+resultados_Y73 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[7]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y73")
+```
+
+```{r}
+resultados_Y74 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[7]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y74")
+```
+
+
+```{r}
+resultados_Y81 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[8]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y81")
+```
+
+```{r}
+resultados_Y82 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[8]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y82")
+```
+
+```{r}
+resultados_Y83 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[8]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y83")
+```
+
+```{r}
+resultados_Y84 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[8]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y84")
+```
+
+```{r}
+resultados_Y91 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[9]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y91")
+```
+
+
+```{r}
+resultados_Y92 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[9]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y92")
+```
+
+```{r}
+resultados_Y93 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[9]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y93")
+```
+
+
+```{r}
+resultados_Y94 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[9]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y94")
+```
+
+```{r}
+resultados_Y101 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[10]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y101")
+```
+
+
+```{r}
+resultados_Y102 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[10]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y102")
+```
+
+```{r}
+resultados_Y103 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[10]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y103")
+```
+
+```{r}
+resultados_Y104 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[10]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y104")
+```
+
+```{r}
+resultados_Y111 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[11]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y111")
+```
+
+```{r}
+resultados_Y112 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[11]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y112")
+```
+
+```{r}
+resultados_Y113 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[11]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y113")
+```
+
+
+```{r}
+resultados_Y114 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[11]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y114")
+```
+
+
+```{r}
+resultados_Y121 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[12]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y121")
+```
+
+```{r}
+resultados_Y122 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[12]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y122")
+```
+
+```{r}
+resultados_Y123 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[12]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y123")
+```
+
+```{r}
+resultados_Y124 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[12]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y124")
+```
+
+```{r}
+resultados_Y131 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[13]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y131")
+```
+
+```{r}
+resultados_Y132 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[13]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y132")
+```
+
+```{r}
+resultados_Y133 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[13]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y133")
+```
+
+```{r}
+resultados_Y134 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[13]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y134")
+```
+
+```{r}
+resultados_Y141 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[14]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y141")
+```
+
+```{r}
+resultados_Y142 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[14]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y142")
+```
+
+```{r}
+resultados_Y143 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[14]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y143")
+```
+
+```{r}
+resultados_Y144 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[14]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y144")
+```
+
+```{r}
+resultados_Y151 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[15]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y151")
+```
+
+```{r}
+resultados_Y152 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0, 
+                                         mw_obj = mw_list[[15]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y152")
+```
+
+```{r}
+resultados_Y153 <- analizar_y_graficar_mw(n = 200, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[15]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y153")
+```
+
+```{r}
+resultados_Y154 <- analizar_y_graficar_mw(n = 2000, 
+                                         phi = 0.9, 
+                                         mw_obj = mw_list[[15]], 
+                                         lim_inf = -5, 
+                                         lim_sup = 5, 
+                                         lineas_diag = c(-3, 3), 
+                                         titulo_base = "Y154")
+```
+
+```{r simulacion_1000_densidad_mw,eval=FALSE, include=FALSE}
+# ==============================================================================
+# 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
+# ==============================================================================
+n_vals <- c(200, 500, 1000, 2000)
+phi_vals <- c(0, 0.5, 0.9)
+M <- 1000
+
+# Parámetros estrictos de la malla (Garantizan comparabilidad)
+lim_inf <- -3
+lim_sup <- 3
+n_grid <- 512
+
+# Pre-asignar un data.frame vacío para guardar el resumen final
+resultados_mise2 <- data.frame(
+  n = integer(),
+  phi = numeric(),
+  metodo = character(),
+  mise = numeric()
+)
+
+
+# Pre-asignar un data.frame vacío para TODOS los errores (serán 24,000 filas)
+resultados_completos2 <- data.frame(
+  n = factor(),
+  phi = factor(),
+  metodo = character(),
+  eci = numeric()
+)
+
+# ==============================================================================
+# 2. CONFIGURACIÓN DEL CLÚSTER PARALELO
+# ==============================================================================
+# Detectar núcleos disponibles dejando uno libre para la estabilidad del sistema
+num_cores <- max(1, parallel::detectCores() - 1)
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+# ==============================================================================
+# 3. BUCLE PRINCIPAL (MONTE CARLO PARALELIZADO)
+# ==============================================================================
+# Fijamos una sola semilla global inicial para todo el experimento
+set.seed(978) 
+
+for (phi in phi_vals) {
+  for (n in n_vals) {
+    
+    # foreach divide las M iteraciones entre los núcleos de forma simultánea
+    # IMPORTANTE: Se agregó .export para que los núcleos reconozcan tus funciones y objetos
+    errores_mc <- foreach(m = 1:M, .combine = 'rbind', 
+                          .packages = c("truncnorm", "nor1mix","stats"),
+                          .export = c("generar_dependiente_mw", "densidad_objetivo_10")) %dopar% {
+      
+      # 1. Generar la muestra estocástica
+      Y <- generar_dependiente_mw(nsim = n, phi = phi, mw_obj = densidad_objetivo_10)
+      
+      # 2. Estimaciones clásicas forzando la malla estricta [-3, 3] con 512 puntos
+      d_nrd0 <- density(Y, bw = "nrd0", from = lim_inf, to = lim_sup, n = n_grid)
+      
+      # tryCatch previene que validación cruzada aborte todo el script si no converge
+      d_ucv <- tryCatch({
+        suppressWarnings(density(Y, bw = "ucv", from = lim_inf, to = lim_sup, n = n_grid))
+      }, error = function(e) {
+        return(d_nrd0) 
+      })
+      
+      # 3. Extraer la malla exacta y evaluar la densidad teórica
+      x_grid <- d_nrd0$x
+      y_teo <- dnorMix(x_grid, densidad_objetivo_10)
+      
+      # 4. Calcular el Error Cuadrático Integrado (ECI) 
+      delta_x <- x_grid[2] - x_grid[1]
+      eci_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
+      eci_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
+      
+      # Retornar los errores
+      c(eci_nrd0, eci_ucv)
+    }
+    
+    # 5. Calcular el MISE
+    mise_nrd0 <- mean(errores_mc[, 1])
+    mise_ucv  <- mean(errores_mc[, 2])
+    
+    # 6. Guardar los resultados del MISE (CORREGIDO: resultados_mise2)
+    resultados_mise2 <- rbind(resultados_mise2, 
+                             data.frame(n = n, phi = phi, metodo = "Silverman (nrd0)", mise = mise_nrd0),
+                             data.frame(n = n, phi = phi, metodo = "UCV", mise = mise_ucv))
+    
+    # 7. Guardar TODOS los ECI individuales
+    df_nrd0 <- data.frame(
+      n = as.factor(n), 
+      phi = paste("Dependencia (phi) =", phi), 
+      metodo = "Silverman", 
+      eci = errores_mc[, 1]
+    )
+    
+    df_ucv <- data.frame(
+      n = as.factor(n), 
+      phi = paste("Dependencia (phi) =", phi), 
+      metodo = "UCV", 
+      eci = errores_mc[, 2]
+    )
+    
+    # Unimos al data.frame maestro (CORREGIDO: resultados_completos2)
+    resultados_completos2 <- rbind(resultados_completos2, df_nrd0, df_ucv)
+    
+  } # Cierra el bucle de "n"
+} # Cierra el bucle de "phi"
+
+# Detener el clúster paralelo para liberar recursos del procesador
+stopCluster(cl)
+
+# # ==============================================================================
+# # 4. PRESENTACIÓN DE RESULTADOS
+# # ==============================================================================
+
+# Renombrar columnas para la salida académica
+colnames(resultados_mise2) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
+
+# Generar la tabla con estética APA para HTML
+knitr::kable(resultados_mise2, 
+             format = "html",
+             digits = 6, 
+             align = "c", 
+             booktabs = TRUE, # Regla clave para las líneas horizontales estilo APA
+             escape = FALSE,  # Permite usar etiquetas HTML en el título
+             caption = "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>") %>%
+  kable_classic(full_width = FALSE, html_font = "Times New Roman") %>%
+  row_spec(0, bold = TRUE) # Pone los nombres de las columnas en negrita
+```
+
+```{r grafico_mise2, eval=FALSE, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1).", include=FALSE}
+library(ggplot2)
+
+# Gráfico de Líneas y Puntos para el MISE usando los nombres de columnas actualizados
+grafico_mise2 <- ggplot(resultados_mise2, aes(x = factor(`Tamaño Muestral (n)`), 
+                                            y = MISE, 
+                                            color = `Selector Empírico`, 
+                                            group = `Selector Empírico`)) +
+  # Agregamos las líneas y los puntos
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  # Separamos por nivel de dependencia (phi) usando el nuevo nombre de la columna
+  facet_wrap(~ paste("Dependencia (phi) =", `Dependencia (phi)`), scales = "free_y", ncol = 1) + 
+  # Colores sobrios y académicos
+  scale_color_manual(values = c("Silverman (nrd0)" = "#2c3e50", "UCV" = "#e74c3c")) +
+  # Etiquetas formales
+  labs(
+    title = "Comportamiento del Error Cuadrático Medio Integrado (MISE)",
+    x = "Tamaño Muestral (n)",
+    y = "MISE",
+    color = "Selector de Ventana:"
+  ) +
+  # Tema estricto para tesis
+  theme_bw() +
+  theme(
+    legend.position = "top",
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    axis.title = element_text(face = "bold"),
+    strip.text = element_text(size = 11, face = "bold"),
+    strip.background = element_rect(fill = "#f4f6f7", color = "black"),
+    panel.grid.minor = element_blank(), # Elimina líneas de cuadrícula innecesarias
+    panel.border = element_rect(color = "black", linewidth = 1)
+  )
+
+print(grafico_mise2)
+```
+
+```{r grafico_cajas2, eval=FALSE, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI).", fig.height=8, fig.width=10, include=FALSE}
+library(ggplot2)
+
+# Gráfico de Cajas Comparativo Optimizado para Tesis
+grafico_cajas2 <- ggplot(resultados_completos2, aes(x = n, y = eci, fill = metodo)) +
+  # Ajuste de las líneas de la caja y transparencia de outliers para no saturar la tinta
+  geom_boxplot(alpha = 0.8, outlier.size = 0.8, outlier.alpha = 0.4, 
+               color = "black", linewidth = 0.5) +
+  # NUEVO: Agregar la media (MISE) como un rombo blanco para contrastar con la mediana
+  # stat_summary(fun = mean, geom = "point", shape = 23, size = 2, 
+  #              fill = "white", color = "black", 
+  #              position = position_dodge(width = 0.75)) +
+  # Separar paneles permitiendo que el eje Y escale independientemente
+  facet_wrap(~ phi, scales = "free_y", ncol = 1) + 
+  # Tonos sobrios, elegantes y aptos para impresión (color ciego amigable)
+  scale_fill_manual(values = c("Silverman" = "#4A5568", "UCV" = "#E53E3E")) +
+  # Etiquetas formales
+  labs(
+    title = "Distribución empírica del Error Cuadrático Integrado (ECI)",
+    # subtitle = "Variabilidad estocástica y sesgo bajo dependencia AR(1) (El rombo central indica el MISE)",
+    x = "Tamaño Muestral (n)",
+    y = "Error Cuadrático Integrado (ECI)",
+    fill = "Selector de Ventana:"
+  ) +
+  # Usar theme_bw en lugar de minimal asegura recuadros negros delimitadores (ideal para tesis)
+  theme_bw(base_size = 12) +
+  theme(
+    # Leyenda enmarcada y bien posicionada
+    legend.position = "top",
+    legend.title = element_text(face = "bold"),
+    legend.background = element_rect(color = "black", linewidth = 0.3),
+    # Títulos centrados
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, color = "gray30"),
+    # Ejes con fuerte contraste
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(color = "black"),
+    # Estilo de las cabeceras de cada panel (strip)
+    strip.text = element_text(size = 11, face = "bold"),
+    strip.background = element_rect(fill = "#f4f6f7", color = "black", linewidth = 1),
+    # Bordes estrictos y limpieza de cuadrícula secundaria
+    panel.border = element_rect(color = "black", linewidth = 1),
+    panel.grid.minor = element_blank()
+  )
+
+print(grafico_cajas2)
+```
+
+
+
+
 
 
