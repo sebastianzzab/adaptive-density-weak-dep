@@ -3,7 +3,8 @@ title: "Presentación y Análisis de Resultados"
 author: "Sebastian Zabala"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
-  html_document:
+  bookdown::html_document2:
+    lang: "es"
     theme: flatly
     toc: true
     toc_depth: 3
@@ -15,6 +16,8 @@ output:
     code_download: true
     df_print: paged
     highlight: tango
+language:
+  fig_caption: "Figura"
 ---
 
 ```{r setup, include=FALSE}
@@ -287,13 +290,13 @@ generar_tabla_apa <- function(dataframe, titulo_html) {
 
 # Resultados del Estudio de Simulación
 
-## Generación de los procesos estocásticos AR(1) y verificación de las condiciones de dependencia débil
+## Procedimiento de generación de los procesos AR(1).
 
 <div align="justify">
 A continuación, para determinar la calidad del proceso de generación inicial propuesto en el esquema de simulación previo, se muestran los gráficos de tres procesos estocásticos AR(1). Estos fueron simulados mediante el comando `arima.sim()` de R, considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
 </div>
 
-```{r acf_verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia.", message=FALSE, warning=FALSE}
+```{r fig-acf-verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia."}
 # Generamos una muestra de n=1000 para ilustrar los tres escenarios de dependencia
 par(mfrow=c(1,3))
 set.seed(1234)
@@ -310,21 +313,23 @@ par(mfrow=c(1,1))
 ```
 
 <div align="justify">
-Se puede apreciar que según sea el nivel de dependencia ($\phi$) el decaimiento del ACF es más o menos pronunciado. En el primer caso ($\phi=0$), su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, para $\phi=0.9$ se presenta que su decaimiento es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos.
+El análisis de los correlogramas del ACF evidencia que según sea el nivel de dependencia ($\phi$) el decaimiento de esta función es más o menos pronunciado. En el primer caso ($\phi=0$), su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, para $\phi=0.9$ el decaimiento del ACF es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos. Estos hallazgos se corresponden con la teoria estudiada.
 </div>
 
 <div align="justify">
-Garantizada la calidad de los procesos estocásticos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras débilmente dependientes con distintas densidades marginales $f(x)$.
+Garantizada la calidad de los procesos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras débilmente dependientes con distintas densidades marginales $f(x)$.
 </div>
 
-## Casos de Estudio de densidad normal truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+## Estudio de caso: Densidad Normal Estándar Truncada (Control)
+Casos de Estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$) 
+
 <div align="justify">
 En este apartado se generan muestras de una distribución normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos. La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
 </div>
 
 ### Caso A: Muestra pequeña ($n=200$)
 
-```{r indep_200_generacion_X11}
+```{r fig-indep-200-X11, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0, n=200)"}
 set.seed(1234)
 resultados_X11 <- analizar_y_graficar_trunc(n = 200, 
                                             phi = 0, 
@@ -342,7 +347,7 @@ resultados_X11 <- analizar_y_graficar_trunc(n = 200,
 Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
 </div>
 
-```{r indep_200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
+```{r 200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
 # par(mfrow=c(1,2))
 # graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
 # graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
@@ -359,7 +364,7 @@ Se puede observar que los métodos clásicos seleccionan un ancho de ventana que
 
 ### Caso B: Comportamiento asintótico ($n=2000$)
 
-```{r indep_2000_generacion_X12}
+```{r fig-indep-2000-X12, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0, n=2000)"}
 set.seed(4321)
 resultados_X12 <- analizar_y_graficar_trunc(n = 2000, 
                                             phi = 0, 
@@ -373,7 +378,7 @@ resultados_X12 <- analizar_y_graficar_trunc(n = 2000,
 ```
 
 <div align="justify">
-Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría. 
+A partir de la figura n, se evidencia que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría. 
 </div>
 
 ```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
@@ -395,7 +400,7 @@ Se puede observar que los métodos clásicos seleccionan un ancho de ventana que
 
 ### Caso C: Muestra pequeña ($n=200$)
 
-```{r fuerte_200_generacion_X13}
+```{r fig-fuerte-200-X13, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0.9, n=200)"}
 set.seed(9876)
 resultados_X13 <- analizar_y_graficar_trunc(n = 200, 
                                             phi = 0.9, 
@@ -427,7 +432,7 @@ En este caso, los métodos de selección clásicos no estiman adecuadamente la d
 
 ### Caso D: Comportamiento asintótico ($n=2000$)
 
-```{r fuerte_2000_generacion_X14}
+```{r fig-fuerte-2000-generacion-X14, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0.9, n=2000)"}
 set.seed(5678)
 resultados_X14 <- analizar_y_graficar_trunc(n = 2000, 
                                             phi = 0.9, 
@@ -469,7 +474,7 @@ El análisis para una muestra no aporta evidencia suficiente sobre el desempeño
 A continuación se muestra una tabla con los errores obtenidos para $p=1000$ réplicas para cada combinación de $n$ y $\phi$ en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para una densidad normal estándar truncada en [-2,2]:
 </div>
 
-```{r simulacion_1000_densidad_normal_truncada}
+```{r tbl-simulacion-densidad-normal-truncada}
 # ==============================================================================
 # 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
 # ==============================================================================
@@ -592,30 +597,10 @@ for (phi in phi_vals) {
 # Detener el clúster paralelo para liberar recursos del procesador
 stopCluster(cl)
 
-# # ==============================================================================
-# # 4. PRESENTACIÓN DE RESULTADOS
-# # ==============================================================================
-# # Renombrar columnas para la salida académica
-# colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
-# 
-# # Generar la tabla limpia en HTML/PDF
-# knitr::kable(resultados_mise, digits = 6, align = "c", 
-#              caption = "Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.")
-
-# Renombrar columnas para la salida académica
-# colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
-# 
-# # Generar la tabla con estética APA para HTML
-# knitr::kable(resultados_mise, 
-#              format = "html",
-#              digits = 6, 
-#              align = "c", 
-#              booktabs = TRUE, # Regla clave para las líneas horizontales estilo APA
-#              escape = FALSE,  # Permite usar etiquetas HTML en el título
-#              caption = "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>") %>%
-#   kable_classic(full_width = FALSE, html_font = "Times New Roman") %>%
-#   row_spec(0, bold = TRUE) # Pone los nombres de las columnas en negrita
-
+# ==============================================================================
+# 4. PRESENTACIÓN DE RESULTADOS
+# ==============================================================================
+# Renombrar columnas para la salida
 colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
 
 titulo_tabla <- "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>"
@@ -627,7 +612,7 @@ generar_tabla_apa(resultados_mise, titulo_tabla)
 Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Esto puede observarse en la siguiente figura:  
 </div>
 
-```{r grafico_mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
+```{r fig-mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
 
 # Gráfico de Líneas y Puntos para el MISE usando los nombres de columnas actualizados
 grafico_mise <- ggplot(resultados_mise, aes(x = factor(`Tamaño Muestral (n)`), 
@@ -671,7 +656,7 @@ En la figura anterior, se ve como validación cruzada produce en promedio errore
 Para complementar lo anterior, se realiza un gráfico de cajas y bigotes para los errores cuadráticos integrados ($ECI$). 
 </div>
 
-```{r grafico_cajas, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI)."}
+```{r fig-cajas-eci, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI)."}
 library(ggplot2)
 
 # Gráfico de Cajas Comparativo Optimizado para Tesis
@@ -743,7 +728,7 @@ print(grafico_violin)
 ```
 
 
-```{r indep_200_generacion_XY21}
+```{r indep-200-generacion-XY21}
 resultados_Y21 <- analizar_y_graficar_mw(n = 200, 
                                          phi = 0, 
                                          mw_obj = mw_list[[2]], 
@@ -1314,7 +1299,7 @@ resultados_Y154 <- analizar_y_graficar_mw(n = 2000,
                                          titulo_base = "Y154")
 ```
 
-```{r simulacion_1000_densidad_mw,eval=FALSE, include=FALSE}
+```{r tbl-simulacion-densidadmw-10,eval=FALSE, include=FALSE}
 # ==============================================================================
 # 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
 # ==============================================================================
@@ -1445,7 +1430,7 @@ knitr::kable(resultados_mise2,
   row_spec(0, bold = TRUE) # Pone los nombres de las columnas en negrita
 ```
 
-```{r grafico_mise2, eval=FALSE, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1).", include=FALSE}
+```{r fig-mise2, eval=FALSE, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1).", include=FALSE}
 library(ggplot2)
 
 # Gráfico de Líneas y Puntos para el MISE usando los nombres de columnas actualizados
@@ -1482,7 +1467,7 @@ grafico_mise2 <- ggplot(resultados_mise2, aes(x = factor(`Tamaño Muestral (n)`)
 print(grafico_mise2)
 ```
 
-```{r grafico_cajas2, eval=FALSE, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI).", fig.height=8, fig.width=10, include=FALSE}
+```{r fig-cajas2, eval=FALSE, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI).", fig.height=8, fig.width=10, include=FALSE}
 library(ggplot2)
 
 # Gráfico de Cajas Comparativo Optimizado para Tesis
