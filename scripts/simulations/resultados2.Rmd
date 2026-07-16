@@ -32,6 +32,7 @@ library(ggplot2)
 library(dplyr)
 library(kableExtra)
 library(nor1mix)
+library(forecast)
 library(parallel) # Si se desea usar computación en paralelo para acelerar uniroot en simulaciones
 
 # =====================================================================
@@ -64,9 +65,9 @@ generar_uniformes_ar1 <- function(nsim, phi) {
 }
 
 
-# ===================================================================================================
+# ======================================================================================
 # FUNCIÓN GENERADORA VARIABLES CON NORMAL TRUNCADA DEPENDIENTE AR(1) MEDIANTE TRANSFORMADA INVERSA
-# ===================================================================================================
+# ======================================================================================
 gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
   U <- generar_uniformes_ar1(nsim, phi)
   
@@ -178,7 +179,7 @@ diagnostico_error_local <- function(X_nrd0, X_ucv, y_teo, lineas_verticales, tit
 }
 
 # ==============================================================================
-# FUNCIÓN ENVOLVENTE: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (NORMAL TRUNCADA)
+# FUNCIÓN: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (NORMAL TRUNCADA)
 # ==============================================================================
 analizar_y_graficar_trunc <- function(n, phi, a, b, m, de, lim_inf, lim_sup, titulo_base) {
   
@@ -226,7 +227,7 @@ analizar_y_graficar_trunc <- function(n, phi, a, b, m, de, lim_inf, lim_sup, tit
 }
 
 # ===================================================================================
-# FUNCIÓN ENVOLVENTE: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (DENSIDADES DE MARRON & WAND)
+# FUNCIÓN: SIMULACIÓN, ESTIMACIÓN Y GRÁFICOS (DENSIDADES DE MARRON & WAND)
 # ===================================================================================
 analizar_y_graficar_mw <- function(n, phi, mw_obj, lim_inf, lim_sup, lineas_diag, titulo_base) {
   
@@ -292,40 +293,46 @@ generar_tabla_apa <- function(dataframe, titulo_html) {
 
 ## Procedimiento de generación de los procesos AR(1).
 
-<div align="justify">
-A continuación, para determinar la calidad del proceso de generación inicial propuesto en el esquema de simulación previo, se muestran los gráficos de tres procesos estocásticos AR(1). Estos fueron simulados mediante el comando `arima.sim()` de R, considerando el parámetro $\phi$ bajo cada uno de los tres niveles de dependencia establecidos previamente con $n=1000$.
-</div>
+::: {align="justify"}
+Para determinar la calidad del proceso de generación propuesto en el esquema de simulación previo, se retoman los tres niveles de dependencia ($\phi$) de los procesos estocásticos AR(1) simulados en el capítulo 2 para generar muestras con densidad normal estándar truncada en [-2,2] con $n=500$. 
+:::
 
-```{r fig-acf-verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos AR(1) generados bajo distintos niveles de dependencia."}
+```{r fig-acf-verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos X generados bajo distintos niveles de dependencia (0.25,0.65,0.95) de un AR(1) con semilla=123."}
 # Generamos una muestra de n=1000 para ilustrar los tres escenarios de dependencia
-par(mfrow=c(1,3))
-set.seed(1234)
-Z_indep <- arima.sim(list(ar=0), n=1000)
-acf(Z_indep, lag.max = 100, main="ACF Independencia (phi = 0)")
+par(mfrow=c(3,2))
+set.seed(123)
+X1 <- gnormtrunc_dep(500, 0.25,-2,2,0,1) 
+hist(X1)
+acf(X1, lag.max = 100, main="A) ACF X con phi = 0.25")
 
-Z_mod   <- arima.sim(list(ar=0.5), n=1000)
-acf(Z_mod,lag.max = 100,main="ACF Dependencia Moderada (phi = 0.5)")
+X2 <- gnormtrunc_dep(500, 0.65,-2,2,0,1)
+hist(X2)
+acf(X2,lag.max = 100,main="B) ACF X con phi = 0.65")
 
-Z_fuerte <- arima.sim(list(ar=0.9), n=1000)
-acf(Z_fuerte, lag.max = 100, main="ACF Dependencia Fuerte (phi = 0.9)")
+X3 <- gnormtrunc_dep(500, 0.95,-2,2,0,1)
+hist(X3)
+acf(X3, lag.max = 100, main="C) ACF X con phi = 0.95")
 par(mfrow=c(1,1))
 
 ```
 
-<div align="justify">
-El análisis de los correlogramas del ACF evidencia que según sea el nivel de dependencia ($\phi$) el decaimiento de esta función es más o menos pronunciado. En el primer caso ($\phi=0$), su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. En el segundo caso ($\phi=0.5$), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, para $\phi=0.9$ el decaimiento del ACF es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos. Estos hallazgos se corresponden con la teoria estudiada.
-</div>
+::: {align="justify"}
+La figura \@ref(fig:fig-acf-verificacion) muestra los histogramas de los procesos generados y los gráficos de las funciones de autocorrelación (ACF) de tres procesos AR(1) con distintos niveles de dependencia. En esta se evidencia que los procesos generados tienen una forma acampanada como la distribucion normal y que según sea el nivel de dependencia ($\phi$) el decaimiento de función de autocorrelación es más o menos pronunciado.
 
-<div align="justify">
+En la figura \@ref(fig:fig-acf-verificacion)A del primer caso con $\phi=0$, su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. Luego en el gráfico para $\phi=0.5$ (\@ref(fig:fig-acf-verificacion)B), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, el grafico para $\phi=0.9$ (\@ref(fig:fig-acf-verificacion)C) el decaimiento del ACF es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos. Estos hallazgos se corresponden con la teoria estudiada.
+:::
+
+::: {align="justify"}
 Garantizada la calidad de los procesos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras débilmente dependientes con distintas densidades marginales $f(x)$.
-</div>
+:::
 
 ## Estudio de caso: Densidad Normal Estándar Truncada (Control)
-Casos de Estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$) 
 
-<div align="justify">
+Casos de Estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+
+::: {align="justify"}
 En este apartado se generan muestras de una distribución normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos. La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
-</div>
+:::
 
 ### Caso A: Muestra pequeña ($n=200$)
 
@@ -343,9 +350,9 @@ resultados_X11 <- analizar_y_graficar_trunc(n = 200,
 
 ```
 
-<div align="justify">
+::: {align="justify"}
 Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
-</div>
+:::
 
 ```{r 200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
 # par(mfrow=c(1,2))
@@ -355,12 +362,10 @@ Se puede observar que los métodos clásicos seleccionan un ancho de ventana que
 
 ```
 
-
 ```{r indep_200_errores, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0)."}
 # diagnostico_error_local(X11, dens_nrd0_X11, dens_ucv_X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
 
 ```
-
 
 ### Caso B: Comportamiento asintótico ($n=2000$)
 
@@ -377,9 +382,9 @@ resultados_X12 <- analizar_y_graficar_trunc(n = 2000,
                                             titulo_base = "X12")
 ```
 
-<div align="justify">
-A partir de la figura n, se evidencia que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría. 
-</div>
+::: {align="justify"}
+En la Figura \@ref(fig:fig-indep-2000-X12) se evidencia que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría.
+:::
 
 ```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
 # par(mfrow=c(1,2))
@@ -389,12 +394,10 @@ A partir de la figura n, se evidencia que los métodos clásicos seleccionan un 
 
 ```
 
-
 ```{r indep_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0)."}
 # diagnostico_error_local(X14, dens_nrd0_X14, dens_ucv_X14, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X14 (n=2000, phi=0)")
 
 ```
-
 
 ## Casos de Estudio de densidad normal truncada en [-2,2]: Comportamiento en Fronteras bajo Dependencia Fuerte ($\phi = 0.9$)
 
@@ -413,9 +416,9 @@ resultados_X13 <- analizar_y_graficar_trunc(n = 200,
                                             titulo_base = "X13")
 ```
 
-<div align="justify">
-En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva con ambos métodos. Esto evidencia, al menos para esta muestra, que la dependencia débil impacta de manera negativa a la eficiencia de los métodos de selección clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. Por ello, se observan mayores errores cuadráticos que en los casos anteriores donde ambos métodos producen resultados similares. 
-</div>
+::: {align="justify"}
+En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva con ambos métodos. Esto evidencia, al menos para esta muestra, que la dependencia débil impacta de manera negativa a la eficiencia de los métodos de selección clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. Por ello, se observan mayores errores cuadráticos que en los casos anteriores donde ambos métodos producen resultados similares.
+:::
 
 ```{r fuerte_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0.9)."}
 # par(mfrow=c(1,2))
@@ -445,9 +448,9 @@ resultados_X14 <- analizar_y_graficar_trunc(n = 2000,
                                             titulo_base = "X14")
 ```
 
-<div align="justify">
+::: {align="justify"}
 Ambos métodos producen estimaciones cercanas a la densidad teórica. Se aprecia que para ambos métodos se tienen errores cuadráticos pequeños, ligeramente mayores a los que se obtuvieron con el mismo $n$ y $\phi=0$. En ciertas regiones el método de Silverman produce errores más grandes que validación cruzada y viceversa. Esto muestra que para densidades de este tipo estos métodos producen, al menos para esta muestra, estimaciones bastante buenas conforme $n$ crece a pesar de $\phi=0.9$.
-</div>
+:::
 
 ```{r fuerte_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0.9)."}
 # par(mfrow=c(1,2))
@@ -462,17 +465,17 @@ Ambos métodos producen estimaciones cercanas a la densidad teórica. Se aprecia
 
 ```
 
-## Casos de estudio: Comportamiento de los métodos con $p=1000$ réplicas 
+## Casos de estudio: Comportamiento de los métodos con $p=1000$ réplicas
 
-<div align="justify">
+::: {align="justify"}
 El análisis para una muestra no aporta evidencia suficiente sobre el desempeño promedio de cualquier estimador. En este caso, del estimador por núcleo bajo cada uno de los métodos de selección del ancho de ventana, nivel de dependencia y tamaño de muestra. Esto debido a que sus resultados pueden variar de muestra de a muestra y por escenario. Por esto, a continuación se muestran los resultados de estudios de simulación considerando una mayor cantidad de réplicas ($p>1$) para cada uno de los tres casos de $n$ y $\phi$ considerados en el esquema de simulación. Las estimaciones se realizan en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para las distintas densidades consideradas.
-</div>
+:::
 
 ### Comportamiento con la densidad normal estándar truncada en [-2,2].
 
-<div align="justify">
+::: {align="justify"}
 A continuación se muestra una tabla con los errores obtenidos para $p=1000$ réplicas para cada combinación de $n$ y $\phi$ en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para una densidad normal estándar truncada en [-2,2]:
-</div>
+:::
 
 ```{r tbl-simulacion-densidad-normal-truncada}
 # ==============================================================================
@@ -608,9 +611,9 @@ titulo_tabla <- "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) p
 generar_tabla_apa(resultados_mise, titulo_tabla)
 ```
 
-<div align="justify">
-Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Esto puede observarse en la siguiente figura:  
-</div>
+::: {align="justify"}
+Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Esto puede observarse en la siguiente figura:
+:::
 
 ```{r fig-mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
 
@@ -648,13 +651,13 @@ grafico_mise <- ggplot(resultados_mise, aes(x = factor(`Tamaño Muestral (n)`),
 print(grafico_mise)
 ```
 
-<div align="justify">
-En la figura anterior, se ve como validación cruzada produce en promedio errores consistentemente más grandes que el método de Silverman, esto puede deberse a que la ventana estimada con Silverman asume que la densidad es normal y regularidad ($\beta=2$), lo cual coincide con la densidad teórica que se quiere estimar en este caso. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada. 
-</div>
+::: {align="justify"}
+En la figura anterior, se ve como validación cruzada produce en promedio errores consistentemente más grandes que el método de Silverman, esto puede deberse a que la ventana estimada con Silverman asume que la densidad es normal y regularidad ($\beta=2$), lo cual coincide con la densidad teórica que se quiere estimar en este caso. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada.
+:::
 
-<div align="justify">
-Para complementar lo anterior, se realiza un gráfico de cajas y bigotes para los errores cuadráticos integrados ($ECI$). 
-</div>
+::: {align="justify"}
+Para complementar lo anterior, se realiza un gráfico de cajas y bigotes para los errores cuadráticos integrados ($ECI$).
+:::
 
 ```{r fig-cajas-eci, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI)."}
 library(ggplot2)
@@ -704,9 +707,9 @@ grafico_cajas <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)
 print(grafico_cajas)
 ```
 
-<div align="justify">
-Se observa que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.  
-</div>
+::: {align="justify"}
+Se observa que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.
+:::
 
 ```{r eval=FALSE, include=FALSE}
 # Gráfico de Violín
@@ -727,7 +730,6 @@ grafico_violin <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo
 print(grafico_violin)
 ```
 
-
 ```{r indep-200-generacion-XY21}
 resultados_Y21 <- analizar_y_graficar_mw(n = 200, 
                                          phi = 0, 
@@ -738,7 +740,6 @@ resultados_Y21 <- analizar_y_graficar_mw(n = 200,
                                          titulo_base = "Y21")
 ```
 
-
 ```{r indep_2000_generacion_XY22}
 resultados_Y22 <- analizar_y_graficar_mw(n = 2000, 
                                          phi = 0, 
@@ -748,7 +749,6 @@ resultados_Y22 <- analizar_y_graficar_mw(n = 2000,
                                          lineas_diag = c(-3, 3), 
                                          titulo_base = "Y22")
 ```
-
 
 ```{r}
 resultados_Y23 <- analizar_y_graficar_mw(n = 200, 
@@ -769,7 +769,6 @@ resultados_Y24 <- analizar_y_graficar_mw(n = 2000,
                                          lineas_diag = c(-3, 3), 
                                          titulo_base = "Y24")
 ```
-
 
 ```{r indep_200_generacion_XY31}
 resultados_Y31 <- analizar_y_graficar_mw(n = 200, 
@@ -931,7 +930,6 @@ resultados_Y64 <- analizar_y_graficar_mw(n = 2000,
                                          titulo_base = "Y64")
 ```
 
-
 ```{r}
 resultados_Y71 <- analizar_y_graficar_mw(n = 200, 
                                          phi = 0, 
@@ -952,7 +950,6 @@ resultados_Y72 <- analizar_y_graficar_mw(n = 2000,
                                          titulo_base = "Y72")
 ```
 
-
 ```{r}
 resultados_Y73 <- analizar_y_graficar_mw(n = 200, 
                                          phi = 0.9, 
@@ -972,7 +969,6 @@ resultados_Y74 <- analizar_y_graficar_mw(n = 2000,
                                          lineas_diag = c(-3, 3), 
                                          titulo_base = "Y74")
 ```
-
 
 ```{r}
 resultados_Y81 <- analizar_y_graficar_mw(n = 200, 
@@ -1024,7 +1020,6 @@ resultados_Y91 <- analizar_y_graficar_mw(n = 200,
                                          titulo_base = "Y91")
 ```
 
-
 ```{r}
 resultados_Y92 <- analizar_y_graficar_mw(n = 2000, 
                                          phi = 0, 
@@ -1045,7 +1040,6 @@ resultados_Y93 <- analizar_y_graficar_mw(n = 200,
                                          titulo_base = "Y93")
 ```
 
-
 ```{r}
 resultados_Y94 <- analizar_y_graficar_mw(n = 2000, 
                                          phi = 0.9, 
@@ -1065,7 +1059,6 @@ resultados_Y101 <- analizar_y_graficar_mw(n = 200,
                                          lineas_diag = c(-3, 3), 
                                          titulo_base = "Y101")
 ```
-
 
 ```{r}
 resultados_Y102 <- analizar_y_graficar_mw(n = 2000, 
@@ -1127,7 +1120,6 @@ resultados_Y113 <- analizar_y_graficar_mw(n = 200,
                                          titulo_base = "Y113")
 ```
 
-
 ```{r}
 resultados_Y114 <- analizar_y_graficar_mw(n = 2000, 
                                          phi = 0.9, 
@@ -1137,7 +1129,6 @@ resultados_Y114 <- analizar_y_graficar_mw(n = 2000,
                                          lineas_diag = c(-3, 3), 
                                          titulo_base = "Y114")
 ```
-
 
 ```{r}
 resultados_Y121 <- analizar_y_graficar_mw(n = 200, 
@@ -1514,9 +1505,3 @@ grafico_cajas2 <- ggplot(resultados_completos2, aes(x = n, y = eci, fill = metod
 
 print(grafico_cajas2)
 ```
-
-
-
-
-
-
