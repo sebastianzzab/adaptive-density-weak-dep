@@ -81,15 +81,19 @@ gnormtrunc_dep <- function(nsim, phi, a, b, m, de) {
 # =====================================================================
 # FUNCIÓN GENERADORA MEDIANTE TRANSFORMADA INVERSA GENERALIZADA 
 # =====================================================================
-generar_dependiente_mw <- function(nsim, phi, mw_obj, limite = c(-15,15)) {
+# generar_dependiente_mw <- function(nsim, phi, mw_obj, limite = c(-15,15)) {
+#   U <- generar_uniformes_ar1(nsim, phi)
+#   
+#   Y_list <- lapply(U, function(u) {
+#     res <- uniroot(function(x) pnorMix(x, mw_obj) - u, interval = limite)
+#     return(res$root)
+#   })
+#   
+#   return(unlist(Y_list))
+# }
+generar_dependiente_mw <- function(nsim, phi, mw_obj) {
   U <- generar_uniformes_ar1(nsim, phi)
-  
-  Y_list <- lapply(U, function(u) {
-    res <- uniroot(function(x) pnorMix(x, mw_obj) - u, interval = limite)
-    return(res$root)
-  })
-  
-  return(unlist(Y_list))
+  return(qnorMix(U, mw_obj))
 }
 
 # ==============================================================================
@@ -119,33 +123,53 @@ est_dens_func <- function(X, bw_metodo, lim_inf, lim_sup) {
   ))
 }
 
+
+# ==============================================================================
+# DEFINICIÓN DE COLORES Y ESTILOS (para impresión en blanco y negro)
+# ==============================================================================
+# color_nrd0 <- "#222222"   # Gris muy oscuro (casi negro) para Silverman
+# color_ucv  <- "#666666"   # Gris medio para Validación Cruzada
+# color_teo  <- "#999999"   # Gris claro para la teórica
+lty_teo    <- 2           # Línea punteada para la teórica (se distingue de los estimadores)
+lwd_teo    <- 3           # Un poco más gruesa para que se note
+
+# ==============================================================================
+# DEFINICIÓN DE COLORES (para mantener consistencia)
+# ==============================================================================
+color_nrd0 <- "#0072B2"   # Azul (Silverman)
+color_ucv  <- "#D55E00"   # Rojo/naranja (Validación Cruzada)
+color_teo  <- "#444444"   # Gris oscuro (densidad teórica, menos agresivo que el negro)
+
 # ==============================================================================
 # FUNCIÓN ASISTENTE UNIFICADA PARA SOBREPONER DENSIDADES
 # ==============================================================================
-graficar_densidades <- function(densidad_est, y_teo, bw_metodo, titulo = "", leyenda_teo = "Teórica") {
+graficar_densidades <- function(densidad_est, y_teo, bw_metodo, titulo = "", 
+                                leyenda_teo = "Teórica", color_est = "#222222") {
   
-  # 1. Extraer los límites dinámicamente desde la malla
   limite_inferior <- min(densidad_est$malla)
   limite_superior <- max(densidad_est$malla)
   
-  # 2. Graficar la estimación del Kernel
+  nombre_metodo <- ifelse(bw_metodo == "nrd0", "Silverman", "Validación Cruzada")
+  
+  # Estimador (sólido, con el color asignado)
   plot(x = densidad_est$malla, 
        y = densidad_est$densidades, 
        type = "l", 
-       main = paste("Densidad", titulo, "[", bw_metodo, "]"), 
        sub = paste("Ancho de banda estimado (h) =", round(densidad_est$h_estimado, 4)),
-       col = "blue", lwd = 2, 
+       col = color_est, lwd = 2, 
        xlim = c(limite_inferior, limite_superior), 
        ylim = c(0, max(densidad_est$densidades) * 1.2),
        xlab = "Valores de X", ylab = "Densidad")
   
-  # 3. Sobreponer la teórica usando el vector y_teo inyectado
-  lines(x = densidad_est$malla, y = y_teo, col = "darkred", lwd = 3, lty = 3)
+  # Teórica: gris claro + punteada
+  lines(x = densidad_est$malla, y = y_teo, col = color_teo, lwd = lwd_teo, lty = lty_teo)
   
-  # 4. Leyenda explicativa dinámica
+  # Leyenda
   legend("topright", 
-         legend = c(paste("Kernel (h =", round(densidad_est$h_estimado, 4), ")"), leyenda_teo), 
-         col = c("blue", "darkred"), lty = c(1, 2), lwd = 2, bty = "n")
+         legend = c(paste(nombre_metodo, "(h =", round(densidad_est$h_estimado, 4), ")"), 
+                    leyenda_teo), 
+         col = c(color_est, color_teo), 
+         lty = c(1, lty_teo), lwd = c(2, lwd_teo), bty = "n")
 }
 
 # ==============================================================================
@@ -153,29 +177,28 @@ graficar_densidades <- function(densidad_est, y_teo, bw_metodo, titulo = "", ley
 # ==============================================================================
 diagnostico_error_local <- function(X_nrd0, X_ucv, y_teo, lineas_verticales, titulo = "") {
   
-  # 1. Extraer la malla exacta generada por R
   x_grid <- X_nrd0$malla
   
-  # 2. Calcular los residuos (Sesgo Local) directamente
   sesgo_nrd0 <- X_nrd0$densidades - y_teo
   sesgo_ucv  <- X_ucv$densidades - y_teo
   
-  # 3. Calcular Error Cuadrático Local
   se_nrd0 <- sesgo_nrd0^2
   se_ucv  <- sesgo_ucv^2
   
-  # 4. GRÁFICO: Penalización de Error Cuadrático (SE)
-  plot(x_grid, se_nrd0, type = "l", col = "blue", lwd = 2,
-       ylab = "Error Cuadrático", xlab = "x",
-       main = paste("Penalización de Error Cuadrático (SE):", titulo))
-       
-  lines(x_grid, se_ucv, col = "darkorange", lwd = 2, lty = 2)
+  # Silverman: gris oscuro, sólido
+  plot(x_grid, se_nrd0, type = "l", col = color_nrd0, lwd = 2,
+       ylab = "Error Cuadrático", xlab = "x")
   
-  # Agregar líneas verticales de fronteras dinámicamente
-  abline(v = lineas_verticales, col = "red", lty = 3)
+  # UCV: gris medio, sólido (pero más claro que Silverman)
+  lines(x_grid, se_ucv, col = color_ucv, lwd = 2, lty = 1)
   
-  legend("topright", legend = c("nrd0", "ucv", "Fronteras"),
-         col = c("blue", "darkorange", "red"), lty = c(1, 2, 3), lwd = 2, bty = "n")
+  # Fronteras: línea punteada en negro
+  abline(v = lineas_verticales, col = "black", lty = 3)
+  
+  legend("topright", 
+         legend = c("Silverman", "Validación Cruzada ", "Fronteras"),
+         col = c(color_nrd0, color_ucv, "black"), 
+         lty = c(1, 1, 3), lwd = c(2, 2, 2), bty = "n")
 }
 
 # ==============================================================================
@@ -183,46 +206,36 @@ diagnostico_error_local <- function(X_nrd0, X_ucv, y_teo, lineas_verticales, tit
 # ==============================================================================
 analizar_y_graficar_trunc <- function(n, phi, a, b, m, de, lim_inf, lim_sup, titulo_base) {
   
-  # 1. Simular datos y estimar densidades empíricas
   X_sim <- gnormtrunc_dep(nsim = n, phi = phi, a = a, b = b, m = m, de = de)
   
   dens_nrd0 <- est_dens_func(X_sim, "nrd0", lim_inf = lim_inf, lim_sup = lim_sup)
   dens_ucv  <- suppressWarnings(est_dens_func(X_sim, "ucv", lim_inf = lim_inf, lim_sup = lim_sup))
   
-  # 2. Calcular la curva teórica UNA SOLA VEZ usando dtruncnorm
   x_grid <- dens_nrd0$malla
   y_teorica <- dtruncnorm(x_grid, a = a, b = b, mean = m, sd = de)
   
-  # 3. Título dinámico
   titulo_grafico <- paste0(titulo_base, " (n=", n, ", phi=", phi, ")")
   
-  # ============================================================================
-  # 4. CONFIGURACIÓN DEL DISEÑO GRÁFICO (LAYOUT)
-  # Matriz: Gráficos de densidades arriba, diagnóstico abajo
-  # ============================================================================
-  matriz_diseno <- matrix(c(1, 2, 
-                            3, 3), nrow = 2, byrow = TRUE)
+  matriz_diseno <- matrix(c(1, 2, 3, 3), nrow = 2, byrow = TRUE)
   layout(matriz_diseno)
-  
   par(mar = c(4, 4, 3, 1) + 0.1)
   
-  # 5. Generar gráficos de densidades superpuestas (Arriba)
-  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, "Teórica (truncnorm)")
-  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, "Teórica (truncnorm)")
+  # Silverman (gris oscuro)
+  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, 
+                      "Teórica (truncnorm)", color_est = color_nrd0)
+  # UCV (gris medio)
+  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, 
+                      "Teórica (truncnorm)", color_est = color_ucv)
   
-  # 6. Generar gráfico de diagnóstico de error local (Abajo)
-  # Pasamos explícitamente c(a, b) para indicar las fronteras de truncamiento
   diagnostico_error_local(X_nrd0 = dens_nrd0, 
                           X_ucv = dens_ucv, 
                           y_teo = y_teorica, 
                           lineas_verticales = c(a, b), 
                           titulo = titulo_grafico)
   
-  # 7. Restaurar parámetros gráficos a la normalidad
   layout(1)
   par(mar = c(5, 4, 4, 2) + 0.1) 
   
-  # 8. Retornar los datos silenciosamente
   return(invisible(list(datos = X_sim, nrd0 = dens_nrd0, ucv = dens_ucv)))
 }
 
@@ -231,47 +244,33 @@ analizar_y_graficar_trunc <- function(n, phi, a, b, m, de, lim_inf, lim_sup, tit
 # ===================================================================================
 analizar_y_graficar_mw <- function(n, phi, mw_obj, lim_inf, lim_sup, lineas_diag, titulo_base) {
   
-  # 1. Simular datos y estimar densidades empíricas
   Y_sim <- generar_dependiente_mw(nsim = n, phi = phi, mw_obj = mw_obj)
   dens_nrd0 <- est_dens_func(Y_sim, "nrd0", lim_inf = lim_inf, lim_sup = lim_sup)
   dens_ucv  <- suppressWarnings(est_dens_func(Y_sim, "ucv", lim_inf = lim_inf, lim_sup = lim_sup))
   
-  # 2. Calcular la curva teórica UNA SOLA VEZ
   x_grid <- dens_nrd0$malla
   y_teorica <- dnorMix(x_grid, mw_obj)
   
-  # 3. Título dinámico
   titulo_grafico <- paste0(titulo_base, " (n=", n, ", phi=", phi, ")")
   
-  # ============================================================================
-  # 4. CONFIGURACIÓN DEL DISEÑO GRÁFICO (LAYOUT)
-  # Creamos una matriz: 
-  # [ 1, 2 ] -> Gráfico 1 (nrd0) y Gráfico 2 (ucv) arriba
-  # [ 3, 3 ] -> Gráfico 3 (Diagnóstico) abajo ocupando ambas columnas
-  # ============================================================================
-  matriz_diseno <- matrix(c(1, 2, 
-                            3, 3), nrow = 2, byrow = TRUE)
+  matriz_diseno <- matrix(c(1, 2, 3, 3), nrow = 2, byrow = TRUE)
   layout(matriz_diseno)
-  
-  # Ajustamos un poco los márgenes para que no se vea tan apretado
   par(mar = c(4, 4, 3, 1) + 0.1)
   
-  # 5. Generar gráficos de densidades superpuestas (Arriba)
-  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, "Teórica (nor1mix)")
-  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, "Teórica (nor1mix)")
+  graficar_densidades(dens_nrd0, y_teorica, "nrd0", titulo_grafico, 
+                      "Teórica (nor1mix)", color_est = color_nrd0)
+  graficar_densidades(dens_ucv,  y_teorica, "ucv",  titulo_grafico, 
+                      "Teórica (nor1mix)", color_est = color_ucv)
   
-  # 6. Generar gráfico de diagnóstico de error local (Abajo)
   diagnostico_error_local(X_nrd0 = dens_nrd0, 
                           X_ucv = dens_ucv, 
                           y_teo = y_teorica, 
                           lineas_verticales = lineas_diag, 
                           titulo = titulo_grafico)
   
-  # 7. Restaurar parámetros gráficos a la normalidad para futuros gráficos
   layout(1)
   par(mar = c(5, 4, 4, 2) + 0.1) 
   
-  # 8. Retornar los datos silenciosamente
   return(invisible(list(datos = Y_sim, nrd0 = dens_nrd0, ucv = dens_ucv)))
 }
 
@@ -294,44 +293,78 @@ generar_tabla_apa <- function(dataframe, titulo_html) {
 ## Procedimiento de generación de los procesos AR(1).
 
 ::: {align="justify"}
-Para determinar la calidad del proceso de generación propuesto en el esquema de simulación previo, se retoman los tres niveles de dependencia ($\phi$) de los procesos estocásticos AR(1) simulados en el capítulo 2 para generar muestras con densidad normal estándar truncada en [-2,2] con $n=500$. 
+Para determinar la calidad del proceso de generación propuesto en el esquema de simulación del capítulo 3, se emplean los tres niveles de dependencia ($\phi$) de los procesos estocásticos AR(1) simulados en el capítulo 2 para generar muestras de una densidad normal estándar truncada en [-2,2] con $n=500$ utilizando una semilla fija (`set.seed(123)`) para garantizar la reproducibilidad. 
 :::
 
-```{r fig-acf-verificacion, fig.cap="Funciones de autocorrelación empírica para los procesos estocásticos X generados bajo distintos niveles de dependencia (0.25,0.65,0.95) de un AR(1) con semilla=123."}
-# Generamos una muestra de n=1000 para ilustrar los tres escenarios de dependencia
-par(mfrow=c(3,2))
+```{r fig-acf-verificacion, fig.cap="Histogramas y funciones de autocorrelación (ACF) empíricas de los procesos X generados bajo distintos niveles de dependencia (ϕ=0.25,0.65,0.95) de un modelo AR(1) con semilla fija (set.seed(123)."}
+# Configuración de la cuadrícula: 3 filas, 2 columnas
+par(mfrow = c(3, 2))
 set.seed(123)
-X1 <- gnormtrunc_dep(500, 0.25,-2,2,0,1) 
-hist(X1)
-acf(X1, lag.max = 100, main="A) ACF X con phi = 0.25")
 
-X2 <- gnormtrunc_dep(500, 0.65,-2,2,0,1)
-hist(X2)
-acf(X2,lag.max = 100,main="B) ACF X con phi = 0.65")
+# ============================================
+# Caso φ = 0.25 (Fila 1)
+# ============================================
 
-X3 <- gnormtrunc_dep(500, 0.95,-2,2,0,1)
-hist(X3)
-acf(X3, lag.max = 100, main="C) ACF X con phi = 0.95")
-par(mfrow=c(1,1))
+# Panel A: Histograma
+X1 <- gnormtrunc_dep(500, 0.25, -2, 2, 0, 1)
+hist(X1, main = "", xlab = "Valores", ylab = "Frecuencia",
+     col = "lightgray", border = "black")
+mtext("A)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# Panel B: ACF
+acf(X1, lag.max = 50, main = "", lwd = 2)
+mtext("B)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# ============================================
+# Caso φ = 0.65 (Fila 2)
+# ============================================
+
+# Panel C: Histograma
+X2 <- gnormtrunc_dep(500, 0.65, -2, 2, 0, 1)
+hist(X2, main = "", xlab = "Valores", ylab = "Frecuencia",
+     col = "lightgray", border = "black")
+mtext("C)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# Panel D: ACF
+acf(X2, lag.max = 50, main = "", lwd = 2)
+mtext("D)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# ============================================
+# Caso φ = 0.95 (Fila 3)
+# ============================================
+
+# Panel E: Histograma
+X3 <- gnormtrunc_dep(500, 0.95, -2, 2, 0, 1)
+hist(X3, main = "", xlab = "Valores", ylab = "Frecuencia",
+     col = "lightgray", border = "black")
+mtext("E)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# Panel F: ACF
+acf(X3, lag.max = 50, main = "", lwd = 2)
+mtext("F)", side = 3, adj = 0, line = 0.5, font = 1.5, cex = 1.2)
+
+# Restaurar configuración gráfica
+par(mfrow = c(1, 1))
 
 ```
 
 ::: {align="justify"}
-La figura \@ref(fig:fig-acf-verificacion) muestra los histogramas de los procesos generados y los gráficos de las funciones de autocorrelación (ACF) de tres procesos AR(1) con distintos niveles de dependencia. En esta se evidencia que los procesos generados tienen una forma acampanada como la distribucion normal y que según sea el nivel de dependencia ($\phi$) el decaimiento de función de autocorrelación es más o menos pronunciado.
+<!-- Los paneles A, C y E muestran los histogramas de las series simuladas (\(n = 500\)) con distribución normal truncada en \([-2, 2]\). Los paneles B, D y F presentan las funciones de autocorrelación (ACF) correspondientes; las líneas azules punteadas indican los límites de significancia aproximados (\(\pm 2/\sqrt{n}\)). Las filas superior, media e inferior corresponden a \(\phi = 0.25\), \(\phi = 0.65\) y \(\phi = 0.95\), respectivamente.  -->
 
-En la figura \@ref(fig:fig-acf-verificacion)A del primer caso con $\phi=0$, su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. Luego en el gráfico para $\phi=0.5$ (\@ref(fig:fig-acf-verificacion)B), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, el grafico para $\phi=0.9$ (\@ref(fig:fig-acf-verificacion)C) el decaimiento del ACF es el más lento de los tres pero que conforme avanza este va decayendo progresivamente, teniendo una mayor cantidad de rezagos estadísticamente significativos. Estos hallazgos se corresponden con la teoria estudiada.
-:::
+La figura \@ref(fig:fig-acf-verificacion) muestra los histogramas de las series simuladas (\(n = 500\)) con distribución normal truncada en \([-2, 2]\) y los gráficos de sus funciones de autocorrelación (ACF); las líneas azules punteadas indican los límites de significancia aproximados (\(\pm 2/\sqrt{n}\)). En esta se evidencia que los procesos generados tienen una forma acampanada como la distribucion normal y que según sea el nivel de dependencia ($\phi$) el decaimiento de su función de autocorrelación es mayor o menor.
+
+En la figura \@ref(fig:fig-acf-verificacion)B ($\phi=0.25$), su decaimiento es rápido, sin rezagos estadísticamente significativos y comportándose como un proceso de ruido blanco. Luego, en el gráfico de la segunda serie con $\phi=0.65$ (figura\@ref(fig:fig-acf-verificacion)D), el decaimiento es más lento, identificándose que los primeros rezagos son estadísticamente significativos. Por último, el gráfico para la tercera serie con $\phi=0.95$ (figura\@ref(fig:fig-acf-verificacion)F) el decaimiento es el más lento, aunque decrece progresivamente a medida que aumenta el rezago, teniendo una mayor cantidad de rezagos estadísticamente significativos. 
 
 ::: {align="justify"}
-Garantizada la calidad de los procesos AR(1) para la parte inicial del esquema de simulación, se procede a generar las muestras débilmente dependientes con distintas densidades marginales $f(x)$.
+Dado que estos hallazgos se corresponden con la teoría estudiada queda garantizada la calidad de las series generadas por el esquema de simulación. Por esto, se procede a simular series débilmente dependientes con distintas densidades marginales $f(x)$.
 :::
 
 ## Estudio de caso: Densidad Normal Estándar Truncada (Control)
 
-Casos de Estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en Fronteras bajo Independencia ($\phi = 0$)
+Casos de estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en fronteras bajo independencia ($\phi = 0$)
 
 ::: {align="justify"}
-En este apartado se generan muestras de una distribución normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos. La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
+En este apartado se generan muestras de una densidad normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos de selección del ancho de ventana (Gl, Silverman y  validación cruzada). La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
 :::
 
 ### Caso A: Muestra pequeña ($n=200$)
@@ -351,7 +384,7 @@ resultados_X11 <- analizar_y_graficar_trunc(n = 200,
 ```
 
 ::: {align="justify"}
-Se puede observar que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse bien a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
+Se observa que los métodos clásicos seleccionan anchos de ventana que permiten al estimador por núcleo aproximarse adecuadamente a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
 :::
 
 ```{r 200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
@@ -383,7 +416,7 @@ resultados_X12 <- analizar_y_graficar_trunc(n = 2000,
 ```
 
 ::: {align="justify"}
-En la Figura \@ref(fig:fig-indep-2000-X12) se evidencia que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe en que el desempeño de dichos métodos mejora con respecto $n$ aumenta por su carácter asintótico y mas aun con una densidad teórica ($f(x)$) bastante suave. Del mismo modo, se aprecian diferencias más pequeñas en las estimaciones de los métodos clásicos con respecto a la densidad teórica en cada punto de la malla. El método de Silveman presenta errores cuadráticos mas grandes que validación cruzada. Esto evidencia, al menos para este caso, como a medida que $n$ aumenta estos métodos se vuelven más precisos tal como lo señala la teoría.
+En la Figura \@ref(fig:fig-indep-2000-X12) se evidencia que los métodos clásicos seleccionan un ancho de ventana que permite al estimador por núcleo aproximarse casi perfectamente a la densidad teórica. Esto se debe a su carácter asintótico: a medida que $n$ crece, la precisión aumenta, especialmente cuando la densidad objetivo es suave. Aunque Silverman sigue mostrando errores cuadráticos ligeramente superiores, las diferencias se reducen considerablemente. Esto evidencia, al menos para este caso, que el incremento muestral conduce a estimaciones más precisas, conforme a la teoría.
 :::
 
 ```{r indep_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0)."}
@@ -403,7 +436,7 @@ En la Figura \@ref(fig:fig-indep-2000-X12) se evidencia que los métodos clásic
 
 ### Caso C: Muestra pequeña ($n=200$)
 
-```{r fig-fuerte-200-X13, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0.9, n=200)"}
+```{r fig-fuerte-200-X13, fig.cap="Comparación de estimadores de densidad (ventana fija vs. adaptativa) sobre una distribución normal truncada en [-2,2], bajo dependencia débil (φ =0.9) y tamaño muestral n = 200)"}
 set.seed(9876)
 resultados_X13 <- analizar_y_graficar_trunc(n = 200, 
                                             phi = 0.9, 
@@ -417,25 +450,12 @@ resultados_X13 <- analizar_y_graficar_trunc(n = 200,
 ```
 
 ::: {align="justify"}
-En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad. Resultando en una densidad estimada con asimetría positiva con ambos métodos. Esto evidencia, al menos para esta muestra, que la dependencia débil impacta de manera negativa a la eficiencia de los métodos de selección clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. Por ello, se observan mayores errores cuadráticos que en los casos anteriores donde ambos métodos producen resultados similares.
+En este caso, los métodos de selección clásicos no estiman adecuadamente la densidad, resultando en una estimación con asimetría positiva para ambos métodos. Esto evidencia, al menos para esta muestra, que la dependencia débil impacta negativamente en la eficiencia de los selectores clásicos. Los datos altamente correlacionados tienden a formar aglomeraciones (clústeres), dejando zonas de la distribución con escasa información. Por ello, se observan mayores errores cuadráticos que en los casos anteriores donde ambos métodos producen resultados similares.
 :::
-
-```{r fuerte_200_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0.9)."}
-# par(mfrow=c(1,2))
-# graficar_densidades_trunc(dens_nrd0_X31, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
-# graficar_densidades_trunc(dens_ucv_X31, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X31 (n=200)")
-# par(mfrow=c(1,1))
-
-```
-
-```{r fuerte_200_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0.9)."}
-# diagnostico_error_local(X31, dens_nrd0_X31, dens_ucv_X31, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X31 (n=200, phi=0.9)")
-
-```
 
 ### Caso D: Comportamiento asintótico ($n=2000$)
 
-```{r fig-fuerte-2000-generacion-X14, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0.9, n=2000)"}
+```{r fig-fuerte-2000-generacion-X14, fig.cap="Comparación de estimadores de densidad (ventana fija vs. adaptativa) sobre una distribución normal truncada en [-2,2], bajo dependencia débil (φ = 0.9) y tamaño muestral n = 2.000."}
 set.seed(5678)
 resultados_X14 <- analizar_y_graficar_trunc(n = 2000, 
                                             phi = 0.9, 
@@ -449,32 +469,19 @@ resultados_X14 <- analizar_y_graficar_trunc(n = 2000,
 ```
 
 ::: {align="justify"}
-Ambos métodos producen estimaciones cercanas a la densidad teórica. Se aprecia que para ambos métodos se tienen errores cuadráticos pequeños, ligeramente mayores a los que se obtuvieron con el mismo $n$ y $\phi=0$. En ciertas regiones el método de Silverman produce errores más grandes que validación cruzada y viceversa. Esto muestra que para densidades de este tipo estos métodos producen, al menos para esta muestra, estimaciones bastante buenas conforme $n$ crece a pesar de $\phi=0.9$.
+Ambos métodos producen estimaciones cercanas a la densidad teórica, con errores cuadráticos pequeños que son ligeramente mayores a los que se obtuvieron con el mismo $n$ y $\phi=0$. En ciertas regiones, el método de Silverman presenta errores más grandes que validación cruzada, y viceversa. Esto sugiere que, incluso bajo dependencia débil, el incremento del tamaño muestral permite obtener estimaciones aceptables, al menos para esta realización particular.
 :::
-
-```{r fuerte_2000_densidades, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=2000, phi=0.9)."}
-# par(mfrow=c(1,2))
-# graficar_densidades_trunc(dens_nrd0_X34, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
-# graficar_densidades_trunc(dens_ucv_X34, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X34 (n=2000)")
-# par(mfrow=c(1,1))
-
-```
-
-```{r fuerte_2000_errores, echo=FALSE, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=2000, phi=0.9)."}
-# diagnostico_error_local(X34, dens_nrd0_X34, dens_ucv_X34, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X34 (n=2000, phi=0.9)")
-
-```
 
 ## Casos de estudio: Comportamiento de los métodos con $p=1000$ réplicas
 
 ::: {align="justify"}
-El análisis para una muestra no aporta evidencia suficiente sobre el desempeño promedio de cualquier estimador. En este caso, del estimador por núcleo bajo cada uno de los métodos de selección del ancho de ventana, nivel de dependencia y tamaño de muestra. Esto debido a que sus resultados pueden variar de muestra de a muestra y por escenario. Por esto, a continuación se muestran los resultados de estudios de simulación considerando una mayor cantidad de réplicas ($p>1$) para cada uno de los tres casos de $n$ y $\phi$ considerados en el esquema de simulación. Las estimaciones se realizan en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para las distintas densidades consideradas.
+El análisis basado en una única muestra no proporciona evidencia suficiente sobre el desempeño promedio del estimador por núcleo bajo diferentes métodos de selección del ancho de ventana, niveles de dependencia y tamaños muestrales, ya que los resultados pueden variar de una muestra a otra y entre escenarios. Por ello, a continuación se presentan los resultados de un estudio de simulación considerando una mayor cantidad de réplicas ($p>1$) para cada una de las combinaciones de $n$ y $\phi$ contemplada. Las estimaciones se realizaron sobre una malla de 512 puntos igualmente espaciados en el intervalo [-3,3] para cada una de las densidades analizadas. La calidad de las estimaciones se evalúa mediante el error cuadrático integrado (ISE), su promedio (MISE) y el error cuadrático medio (MSE).
 :::
 
 ### Comportamiento con la densidad normal estándar truncada en [-2,2].
 
 ::: {align="justify"}
-A continuación se muestra una tabla con los errores obtenidos para $p=1000$ réplicas para cada combinación de $n$ y $\phi$ en una malla de $n=512$ puntos igualmente espaciados en [-3,3] para una densidad normal estándar truncada en [-2,2]:
+A continuación se muestra una tabla con los errores cuadráticos medios integrados (MISE) obtenidos para $p=1000$ réplicas, para cada combinación de $n$ y $\phi$, evaluados sobre una malla de $n=512$ puntos igualmente espaciados en el intervalo [-3,3] para una densidad normal estándar truncada en [-2,2]:
 :::
 
 ```{r tbl-simulacion-densidad-normal-truncada}
@@ -510,7 +517,7 @@ resultados_completos <- data.frame(
   n = factor(),
   phi = factor(),
   metodo = character(),
-  eci = numeric()
+  ise = numeric()
 )
 
 # ==============================================================================
@@ -551,17 +558,17 @@ for (phi in phi_vals) {
       x_grid <- d_nrd0$x
       y_teo <- dtruncnorm(x_grid, a = a_t, b = b_t, mean = m_t, sd = de_t)
       
-      # 4. Calcular el Error Cuadrático Integrado (ECI) 
+      # 4. Calcular el Error Cuadrático Integrado (ise) 
       # Se usa la aproximación geométrica (suma de Riemann) sobre la malla
       delta_x <- x_grid[2] - x_grid[1]
-      eci_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
-      eci_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
+      ise_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
+      ise_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
       
       # Retornar los errores de esta iteración específica
-      c(eci_nrd0, eci_ucv)
+      c(ise_nrd0, ise_ucv)
     }
     
-    # 5. Calcular el MISE promediando los ECI de las M réplicas
+    # 5. Calcular el MISE promediando los ISE de las M réplicas
     mise_nrd0 <- mean(errores_mc[, 1])
     mise_ucv  <- mean(errores_mc[, 2])
     
@@ -571,7 +578,7 @@ for (phi in phi_vals) {
                              data.frame(n = n, phi = phi, metodo = "UCV", mise = mise_ucv))
     
     # -------------------------------------------------------------------------
-    # 7. NUEVO: Guardar TODOS los ECI individuales en lugar de solo el promedio
+    # 7. NUEVO: Guardar TODOS los ISE individuales en lugar de solo el promedio
     # Esto va ADENTRO del bucle de "n"
     # -------------------------------------------------------------------------
     
@@ -580,7 +587,7 @@ for (phi in phi_vals) {
       n = as.factor(n), 
       phi = paste("Dependencia (phi) =", phi), 
       metodo = "Silverman", 
-      eci = errores_mc[, 1]
+      ise = errores_mc[, 1]
     )
     
     # Creamos un data.frame temporal para UCV
@@ -588,7 +595,7 @@ for (phi in phi_vals) {
       n = as.factor(n), 
       phi = paste("Dependencia (phi) =", phi), 
       metodo = "UCV", 
-      eci = errores_mc[, 2]
+      ise = errores_mc[, 2]
     )
     
     # Unimos al data.frame maestro
@@ -606,13 +613,14 @@ stopCluster(cl)
 # Renombrar columnas para la salida
 colnames(resultados_mise) <- c("Tamaño Muestral (n)", "Dependencia (phi)", "Selector Empírico", "MISE")
 
-titulo_tabla <- "<b>Tabla 1</b><br><i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>"
+titulo_tabla <- "<i>Error Cuadrático Medio Integrado (MISE) para selectores clásicos sobre una malla fija de 512 puntos, basado en 1000 iteraciones de Monte Carlo.</i>"
 
 generar_tabla_apa(resultados_mise, titulo_tabla)
 ```
 
 ::: {align="justify"}
-Se observa que en promedio, ambos métodos producen resultados similares. No se encuentran diferencias notables entre los $MISE(x)$ entre mismas combinaciones. Sin embargo, para ambos métodos con $n=200$ y $\phi=0.9$ se observa que son aproximadamente seis veces mayores que los que se tiene con el mismo $n$ pero $\phi=0$, lo que muestra que con pocos datos, estos métodos no logran predecir adecuadamente bajo dependencia débil. Esto puede observarse en la siguiente figura:
+Se observa que en promedio, ambos métodos producen resultados similares, sin diferencias notables entre sus respectivos $MISE(x)$ para cada combinación de 
+$n$ y $\phi$. Sin embargo, para $n=200$ y $\phi=0.9$, los errores son aproximadamente seis veces superiores a los obtenidos con el mismo tamaño muestral pero bajo independencia ($\phi=0$). Esto indica que, con muestras reducidas, los selectores clásicos no logran estimar adecuadamente la densidad cuando la dependencia es débil. Este comportamiento se ilustra en la siguiente figura:
 :::
 
 ```{r fig-mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
@@ -652,18 +660,18 @@ print(grafico_mise)
 ```
 
 ::: {align="justify"}
-En la figura anterior, se ve como validación cruzada produce en promedio errores consistentemente más grandes que el método de Silverman, esto puede deberse a que la ventana estimada con Silverman asume que la densidad es normal y regularidad ($\beta=2$), lo cual coincide con la densidad teórica que se quiere estimar en este caso. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada.
+En la figura anterior se observa cómo la validación cruzada produce, en promedio, errores consistentemente mayores que el método de Silverman; esto puede deberse a que la ventana estimada con Silverman asume normalidad y regularidad de orden 2 ($\beta=2$), condición que coincide con la densidad teórica en este caso. Por otro lado, a medida en que $n$ aumenta en promedio los errores de ambos métodos tienden a cero, lo que concuerda con la teoría estudiada.
 :::
 
 ::: {align="justify"}
-Para complementar lo anterior, se realiza un gráfico de cajas y bigotes para los errores cuadráticos integrados ($ECI$).
+Para complementar lo anterior, se presenta un diagrama de cajas y bigotes para los errores cuadráticos integrados ($ISE$).
 :::
 
-```{r fig-cajas-eci, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI)."}
+```{r fig-cajas-ise, fig.width=10, fig.height=8, fig.cap="Distribución empírica del Error Cuadrático Integrado (ISE)."}
 library(ggplot2)
 
 # Gráfico de Cajas Comparativo Optimizado para Tesis
-grafico_cajas <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)) +
+grafico_cajas <- ggplot(resultados_completos, aes(x = n, y = ise, fill = metodo)) +
   # Ajuste de las líneas de la caja y transparencia de outliers para no saturar la tinta
   geom_boxplot(alpha = 0.8, outlier.size = 0.8, outlier.alpha = 0.4, 
                color = "black", linewidth = 0.5) +
@@ -677,10 +685,10 @@ grafico_cajas <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)
   scale_fill_manual(values = c("Silverman" = "#4A5568", "UCV" = "#E53E3E")) +
   # Etiquetas formales
   labs(
-    title = "Distribución empírica del Error Cuadrático Integrado (ECI)",
+    title = "Distribución empírica del Error Cuadrático Integrado (ISE)",
     # subtitle = "Variabilidad estocástica y sesgo bajo dependencia AR(1) (El rombo central indica el MISE)",
     x = "Tamaño Muestral (n)",
-    y = "Error Cuadrático Integrado (ECI)",
+    y = "Error Cuadrático Integrado (ISE)",
     fill = "Selector de Ventana:"
   ) +
   # Usar theme_bw en lugar de minimal asegura recuadros negros delimitadores (ideal para tesis)
@@ -708,12 +716,12 @@ print(grafico_cajas)
 ```
 
 ::: {align="justify"}
-Se observa que la distribución del $ECI$ con $n=200$ y $n=500$ para los dos métodos cuenta con errores bastante grandes que salen de la caja, en donde validación cruzada destaca por tener mas. Lo que releva la variabilidad que tienen estos métodos de muestra a muestra, principalmente validación cruzada. Dado que para unos casos se pueden tener errores aceptables pero que en otros son bastante grandes en comparación a los demás. Sin embargo, conforme $n$ aumenta, se repite en menor medida en los siguientes casos, donde no se encuentran errores tan grandes que sobresalgan de las caja en ambos métodos.
+Se observa que la distribución del ISE, para $n=200$ y $n=500$, presenta errores atípicos de gran magnitud en ambos métodos, aunque la validación cruzada destaca por tener una mayor cantidad de valores extremos. Esto revela la alta variabilidad de estos selectores de muestra a muestra, especialmente en la validación cruzada, donde en unas réplicas se obtienen errores aceptables, mientras que en otras alcanzan magnitudes considerablemente superiores al resto. No obstante, a medida que $n$ aumenta, la frecuencia de estos valores atípicos disminuye; para $n=1000$ y $n=2000$ no se observan errores que sobresalgan de los límites de las cajas en ninguno de los dos métodos.
 :::
 
 ```{r eval=FALSE, include=FALSE}
 # Gráfico de Violín
-grafico_violin <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo)) +
+grafico_violin <- ggplot(resultados_completos, aes(x = n, y = ise, fill = metodo)) +
   geom_violin(alpha = 0.6, trim = FALSE, scale = "width") +
   facet_wrap(~ phi, scales = "free_y", ncol = 1) +
   scale_fill_manual(values = c("Silverman" = "#2980b9", "UCV" = "#d35400")) +
@@ -721,7 +729,7 @@ grafico_violin <- ggplot(resultados_completos, aes(x = n, y = eci, fill = metodo
     title = "Densidad Empírica de los Errores de Estimación",
     subtitle = "Visualización de las colas pesadas en la varianza estocástica de los selectores",
     x = "Tamaño Muestral (n)",
-    y = "Densidad del Error (ECI)",
+    y = "Densidad del Error (ISE)",
     fill = "Selector:"
   ) +
   theme_bw() +
@@ -1317,7 +1325,7 @@ resultados_completos2 <- data.frame(
   n = factor(),
   phi = factor(),
   metodo = character(),
-  eci = numeric()
+  ise = numeric()
 )
 
 # ==============================================================================
@@ -1360,13 +1368,13 @@ for (phi in phi_vals) {
       x_grid <- d_nrd0$x
       y_teo <- dnorMix(x_grid, densidad_objetivo_10)
       
-      # 4. Calcular el Error Cuadrático Integrado (ECI) 
+      # 4. Calcular el Error Cuadrático Integrado (ISE) 
       delta_x <- x_grid[2] - x_grid[1]
-      eci_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
-      eci_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
+      ise_nrd0 <- sum((d_nrd0$y - y_teo)^2) * delta_x
+      ise_ucv  <- sum((d_ucv$y - y_teo)^2) * delta_x
       
       # Retornar los errores
-      c(eci_nrd0, eci_ucv)
+      c(ise_nrd0, ise_ucv)
     }
     
     # 5. Calcular el MISE
@@ -1378,19 +1386,19 @@ for (phi in phi_vals) {
                              data.frame(n = n, phi = phi, metodo = "Silverman (nrd0)", mise = mise_nrd0),
                              data.frame(n = n, phi = phi, metodo = "UCV", mise = mise_ucv))
     
-    # 7. Guardar TODOS los ECI individuales
+    # 7. Guardar TODOS los ISE individuales
     df_nrd0 <- data.frame(
       n = as.factor(n), 
       phi = paste("Dependencia (phi) =", phi), 
       metodo = "Silverman", 
-      eci = errores_mc[, 1]
+      ise = errores_mc[, 1]
     )
     
     df_ucv <- data.frame(
       n = as.factor(n), 
       phi = paste("Dependencia (phi) =", phi), 
       metodo = "UCV", 
-      eci = errores_mc[, 2]
+      ise = errores_mc[, 2]
     )
     
     # Unimos al data.frame maestro (CORREGIDO: resultados_completos2)
@@ -1458,11 +1466,11 @@ grafico_mise2 <- ggplot(resultados_mise2, aes(x = factor(`Tamaño Muestral (n)`)
 print(grafico_mise2)
 ```
 
-```{r fig-cajas2, eval=FALSE, fig.cap="Distribución empírica del Error Cuadrático Integrado (ECI).", fig.height=8, fig.width=10, include=FALSE}
+```{r fig-cajas2, eval=FALSE, fig.cap="Distribución empírica del Error Cuadrático Integrado (ISE).", fig.height=8, fig.width=10, include=FALSE}
 library(ggplot2)
 
 # Gráfico de Cajas Comparativo Optimizado para Tesis
-grafico_cajas2 <- ggplot(resultados_completos2, aes(x = n, y = eci, fill = metodo)) +
+grafico_cajas2 <- ggplot(resultados_completos2, aes(x = n, y = ise, fill = metodo)) +
   # Ajuste de las líneas de la caja y transparencia de outliers para no saturar la tinta
   geom_boxplot(alpha = 0.8, outlier.size = 0.8, outlier.alpha = 0.4, 
                color = "black", linewidth = 0.5) +
@@ -1476,10 +1484,10 @@ grafico_cajas2 <- ggplot(resultados_completos2, aes(x = n, y = eci, fill = metod
   scale_fill_manual(values = c("Silverman" = "#4A5568", "UCV" = "#E53E3E")) +
   # Etiquetas formales
   labs(
-    title = "Distribución empírica del Error Cuadrático Integrado (ECI)",
+    title = "Distribución empírica del Error Cuadrático Integrado (ISE)",
     # subtitle = "Variabilidad estocástica y sesgo bajo dependencia AR(1) (El rombo central indica el MISE)",
     x = "Tamaño Muestral (n)",
-    y = "Error Cuadrático Integrado (ECI)",
+    y = "Error Cuadrático Integrado (ISE)",
     fill = "Selector de Ventana:"
   ) +
   # Usar theme_bw en lugar de minimal asegura recuadros negros delimitadores (ideal para tesis)
