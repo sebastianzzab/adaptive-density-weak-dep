@@ -4,3 +4,4 @@
 .Ruserdata
 venv/
 .ipynb_checkpoints/
+*.pdf
