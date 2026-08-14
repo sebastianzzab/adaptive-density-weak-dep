@@ -1,0 +1,209 @@
+---
+title: "EDA variables temperatura"
+author: "Sebastian Zabala"
+format: html
+editor: visual
+---
+
+## Análisis exploratorio
+
+Dentro del análisis exploratorio de series de tiempo se pueden realizar los siguientes procedimientos:
+
+- **Estimación de tendencias y descomposición:** Se utiliza para el ajuste estacional. Busca construir, a partir de una serie temporal observada, una serie de subcomponentes con diferentes características.
+- **Análisis de autocorrelación:** permite estimar qué valor en el pasado tiene una correlación con el valor actual. Proporciona la estimación de los factores p, d, q para los modelos ARIMA.
+- **Análisis espectral:** Describe cómo la variación en una serie de tiempo puede ser explicada por componentes cíclicos. Permite separar los componentes periódicos en un ambiente ruidoso.
+
+```{r}
+# Función cv
+cv <- function(x, percentage = TRUE, na.rm = FALSE) {
+  cv <- sd(x, na.rm = na.rm)/abs(mean(x, na.rm = na.rm)) * ifelse(percentage, 100, 1)
+  return(cv)
+}
+```
+
+
+Se empiezan importando los datos de su respectivo archivo con extension .csv y se visualiza la cantidad de observaciones en cada una de las variables (los cuales deben ser del mismo tama;o):
+
+```{r}
+library(readr)
+data <- read_csv("Descargas/Ali_amb_temp_sard.vs.eez.csv")
+# View(data)
+
+# cantidad de observaciones por cada variable
+length_var <- c(length(data$temp.media), length(data$temp.max), length(data$temp.min))
+length_var # c(257, 257, 257)
+
+```
+Cada una de las tres variables tiene 257 observaciones. Ahora se crea un dataframe con las tres observaciones que son objeto de estudio y se imprimen las primeras observacionesn:
+
+```{r}
+# creando el df con las tres variables que nos interesan
+data_sardinas <- data.frame(data[,1],data[,2],data[,3],data[,4],data[,5])
+head(data_sardinas)
+# summary(c(data_sardinas[,3],data_sardinas[,4],data_sardinas[,5]))
+```
+```{r}
+summary(data_sardinas)
+```
+
+### Gráficos de las series observadas
+
+```{r}
+library(ggplot2)
+library(ggfortify)
+temp.min <- ts(data_sardinas$temp.min, frequency=12, start=c(2002,8))
+temp.mean <- ts(data_sardinas$temp.media, frequency=12, start=c(2002,8))
+temp.max <- ts(data_sardinas$temp.max, frequency=12, start=c(2002,8))
+# old.par <- par(mfrow = c(3,1))
+# par(old.par)
+# plot.ts(temp.min, xlab="Tiempo", ylab="Temperatura minima")
+autoplot(temp.min) + 
+  ggtitle("Temperatura minima por Mes") +
+  labs(x="Año", y="Temperatura minima")
+```
+
+
+```{r}
+# plot.ts(temp.mean, xlab="Tiempo", ylab="Temperatura media")
+autoplot(temp.mean) + 
+  ggtitle("Temperatura media por Mes") +
+  labs(x="Año", y="Temperatura media")
+```
+
+
+```{r}
+# plot.ts(temp.max, xlab="Tiempo", ylab="Temperatura maxima")
+autoplot(temp.max) + 
+  ggtitle("Temperatura maxima por Mes") +
+  labs(x="Año", y="Temperatura maxima")
+```
+
+### Gráficos de cajas y bigotes de las series observadas
+
+```{r}
+boxplot(temp.min~cycle(temp.min))
+```
+
+
+```{r}
+boxplot(temp.mean~cycle(temp.mean))
+```
+
+
+
+```{r}
+boxplot(temp.max~cycle(temp.max))
+```
+
+
+
+
+```{r}
+temp.mincomponents <- decompose(temp.min)
+plot(temp.mincomponents)
+```
+
+
+```{r}
+ts.plot(temp.mincomponents$seasonal,temp.mincomponents$random, col=c("blue","red"))
+```
+
+
+```{r}
+temp.meancomponents <- decompose(temp.mean)
+plot(temp.meancomponents)
+```
+
+```{r}
+ts.plot(temp.meancomponents$seasonal,temp.meancomponents$random, col=c("blue","red"))
+```
+
+
+```{r}
+temp.maxcomponents <- decompose(temp.max)
+plot(temp.maxcomponents)
+```
+
+
+```{r}
+ts.plot(temp.maxcomponents$seasonal,temp.maxcomponents$random, col=c("blue","red"))
+```
+
+
+```{r}
+library(TTR)
+
+# Aplicar suavizado con media móvil de 12 períodos
+suavizado1 <- SMA(temp.min, n=12)
+
+# Graficar original y suavizado
+plot(temp.min, main="Suavizado con Media Móvil", col="gray")
+lines(suavizado1, col="red", lwd=2)
+```
+
+
+```{r}
+# Aplicar suavizado con media móvil de 12 períodos
+suavizado2 <- SMA(temp.mean, n=12)
+
+# Graficar original y suavizado
+plot(temp.mean, main="Suavizado con Media Móvil", col="gray")
+lines(suavizado2, col="red", lwd=2)
+```
+
+
+```{r}
+# Aplicar suavizado con media móvil de 12 períodos
+suavizado3 <- SMA(temp.max, n=12)
+
+# Graficar original y suavizado
+plot(temp.max, main="Suavizado con Media Móvil", col="gray")
+lines(suavizado3, col="red", lwd=2)
+```
+
+
+```{r}
+library(forecast)
+
+# Ajustar un modelo ARIMA automáticamente
+modelo_arima1 <- auto.arima(temp.min)
+
+# Realizar predicciones para los próximos 12 meses
+predicciones1 <- forecast(modelo_arima1, h=12)
+
+# Graficar predicciones
+autoplot(predicciones1)
+```
+
+
+```{r}
+# Ajustar un modelo ARIMA automáticamente
+modelo_arima2 <- auto.arima(temp.mean)
+
+# Realizar predicciones para los próximos 12 meses
+predicciones2 <- forecast(modelo_arima2, h=12)
+
+# Graficar predicciones
+autoplot(predicciones2)
+```
+
+
+```{r}
+
+# Ajustar un modelo ARIMA automáticamente
+modelo_arima3 <- auto.arima(temp.max)
+
+# Realizar predicciones para los próximos 12 meses
+predicciones3 <- forecast(modelo_arima3, h=12)
+
+# Graficar predicciones
+autoplot(predicciones3)
+```
+
+
+
+```{r}
+apply(data_sardinas, 2, cv)
+```
+
+Se aprecia que la temperatura máxima tiene una variabilidad mayor (7.85%) que la temperatura mínima (6.60%) y la temperatura media (6.09%). Tomando en cuenta los umbrales establecidos por Vargas, V. (2007), al ser cada uno de los CV menores a 30%, se tiene que los datos son relativamente homogeneos. Por lo tanto, la media es representativa.
