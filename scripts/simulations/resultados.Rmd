@@ -364,14 +364,14 @@ Dado que estos hallazgos se corresponden con la teoría estudiada queda garantiz
 Casos de estudio de densidad normal estándar truncada en [-2,2]: Comportamiento en fronteras bajo independencia ($\phi = 0$)
 
 ::: {align="justify"}
-En este apartado se generan muestras de una densidad normal estándar truncada en [-2,2] de tamaño $n \in \{200,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos de selección del ancho de ventana (Gl, Silverman y  validación cruzada). La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
+En este apartado se generan muestras de una densidad normal estándar truncada en [-2,2] de tamaño $n \in \{60,2000\}$ con $\phi \in \{0,0.9\}$ para contrastar el comportamiento asintótico y el efecto de la dependencia en las estimaciones de los métodos de selección del ancho de ventana (Gl, Silverman y  validación cruzada). La calidad de las estimaciones se evalúa mediante el error cuadrático para una malla de $n=512$ puntos igualmente espaciados en [-3,3] para los tres métodos de selección.
 :::
 
-### Caso A: Muestra pequeña ($n=200$)
+### Caso A: Muestra pequeña ($n=60$)
 
-```{r fig-indep-200-X11, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0, n=200)"}
+```{r fig-indep-60-X11, fig.cap="Estimación de densidad normal estandar truncada en [-2,2] para una malla de 512 puntos en [-3,3] (phi=0, n=60)"}
 set.seed(1234)
-resultados_X11 <- analizar_y_graficar_trunc(n = 200, 
+resultados_X11 <- analizar_y_graficar_trunc(n = 60, 
                                             phi = 0, 
                                             a = -2, 
                                             b = 2, 
@@ -387,16 +387,16 @@ resultados_X11 <- analizar_y_graficar_trunc(n = 200,
 Se observa que los métodos clásicos seleccionan anchos de ventana que permiten al estimador por núcleo aproximarse adecuadamente a la densidad teórica. Por otro lado, se aprecia que el método de validación cruzada presenta errores cuadráticos más pequeños que el método de Silverman en la mayoría de los puntos de la malla de estimación.
 :::
 
-```{r 200_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=200, phi=0).", message=FALSE, warning=FALSE}
+```{r 60_densidades, fig.cap="Estimación de la función de densidad utilizando la regla empírica de Silverman y Validación Cruzada frente a la curva teórica truncada (n=60, phi=0).", message=FALSE, warning=FALSE}
 # par(mfrow=c(1,2))
-# graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
-# graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=200)")
+# graficar_densidades_trunc(dens_nrd0_X11, "nrd0", a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=60)")
+# graficar_densidades_trunc(dens_ucv_X11, "ucv",  a = -2, b = 2, m = 0, de = 1, titulo = "X11 (n=60)")
 # par(mfrow=c(1,1))
 
 ```
 
-```{r indep_200_errores, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=200, phi=0)."}
-# diagnostico_error_local(X11, dens_nrd0_X11, dens_ucv_X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=200, phi=0)")
+```{r indep_60_errores, warning=FALSE, message=FALSE, fig.cap="Diagnóstico del sesgo y error cuadrático local para los selectores de ancho de ventana clásicos, evidenciando el efecto de frontera por truncamiento (n=60, phi=0)."}
+# diagnostico_error_local(X11, dens_nrd0_X11, dens_ucv_X11, a = -2, b = 2, m = 0, de = 1, lim_inf = -3, lim_sup = 3, titulo = "X11 (n=60, phi=0)")
 
 ```
 
@@ -434,11 +434,11 @@ En la Figura \@ref(fig:fig-indep-2000-X12) se evidencia que los métodos clásic
 
 ## Casos de Estudio de densidad normal truncada en [-2,2]: Comportamiento en Fronteras bajo Dependencia Fuerte ($\phi = 0.9$)
 
-### Caso C: Muestra pequeña ($n=200$)
+### Caso C: Muestra pequeña ($n=60$)
 
-```{r fig-fuerte-200-X13, fig.cap="Comparación de estimadores de densidad (ventana fija vs. adaptativa) sobre una distribución normal truncada en [-2,2], bajo dependencia débil (φ =0.9) y tamaño muestral n = 200)"}
+```{r fig-fuerte-60-X13, fig.cap="Comparación de estimadores de densidad (ventana fija vs. adaptativa) sobre una distribución normal truncada en [-2,2], bajo dependencia débil (φ =0.9) y tamaño muestral n = 60)"}
 set.seed(9876)
-resultados_X13 <- analizar_y_graficar_trunc(n = 200, 
+resultados_X13 <- analizar_y_graficar_trunc(n = 60, 
                                             phi = 0.9, 
                                             a = -2, 
                                             b = 2, 
@@ -488,7 +488,7 @@ A continuación se muestra una tabla con los errores cuadráticos medios integra
 # ==============================================================================
 # 1. PARÁMETROS DEL ESTUDIO DE SIMULACIÓN
 # ==============================================================================
-n_vals <- c(200, 500, 1000, 2000)
+n_vals <- c(60, 500, 1000, 2000)
 phi_vals <- c(0, 0.5, 0.9)
 M <- 1000
 
@@ -620,7 +620,7 @@ generar_tabla_apa(resultados_mise, titulo_tabla)
 
 ::: {align="justify"}
 Se observa que en promedio, ambos métodos producen resultados similares, sin diferencias notables entre sus respectivos $MISE(x)$ para cada combinación de 
-$n$ y $\phi$. Sin embargo, para $n=200$ y $\phi=0.9$, los errores son aproximadamente seis veces superiores a los obtenidos con el mismo tamaño muestral pero bajo independencia ($\phi=0$). Esto indica que, con muestras reducidas, los selectores clásicos no logran estimar adecuadamente la densidad cuando la dependencia es débil. Este comportamiento se ilustra en la siguiente figura:
+$n$ y $\phi$. Sin embargo, para $n=60$ y $\phi=0.9$, los errores son aproximadamente seis veces superiores a los obtenidos con el mismo tamaño muestral pero bajo independencia ($\phi=0$). Esto indica que, con muestras reducidas, los selectores clásicos no logran estimar adecuadamente la densidad cuando la dependencia es débil. Este comportamiento se ilustra en la siguiente figura:
 :::
 
 ```{r fig-mise, fig.cap="Evolución del Error Cuadrático Medio Integrado (MISE) en función del tamaño muestral bajo distintos niveles de dependencia AR(1)."}
@@ -716,7 +716,7 @@ print(grafico_cajas)
 ```
 
 ::: {align="justify"}
-Se observa que la distribución del ISE, para $n=200$ y $n=500$, presenta errores atípicos de gran magnitud en ambos métodos, aunque la validación cruzada destaca por tener una mayor cantidad de valores extremos. Esto revela la alta variabilidad de estos selectores de muestra a muestra, especialmente en la validación cruzada, donde en unas réplicas se obtienen errores aceptables, mientras que en otras alcanzan magnitudes considerablemente superiores al resto. No obstante, a medida que $n$ aumenta, la frecuencia de estos valores atípicos disminuye; para $n=1000$ y $n=2000$ no se observan errores que sobresalgan de los límites de las cajas en ninguno de los dos métodos.
+Se observa que la distribución del ISE, para $n=60$ y $n=500$, presenta errores atípicos de gran magnitud en ambos métodos, aunque la validación cruzada destaca por tener una mayor cantidad de valores extremos. Esto revela la alta variabilidad de estos selectores de muestra a muestra, especialmente en la validación cruzada, donde en unas réplicas se obtienen errores aceptables, mientras que en otras alcanzan magnitudes considerablemente superiores al resto. No obstante, a medida que $n$ aumenta, la frecuencia de estos valores atípicos disminuye; para $n=1000$ y $n=2000$ no se observan errores que sobresalgan de los límites de las cajas en ninguno de los dos métodos.
 :::
 
 ```{r eval=FALSE, include=FALSE}
@@ -738,8 +738,8 @@ grafico_violin <- ggplot(resultados_completos, aes(x = n, y = ise, fill = metodo
 print(grafico_violin)
 ```
 
-```{r indep-200-generacion-XY21}
-resultados_Y21 <- analizar_y_graficar_mw(n = 200, 
+```{r indep-60-generacion-XY21}
+resultados_Y21 <- analizar_y_graficar_mw(n = 60, 
                                          phi = 0, 
                                          mw_obj = mw_list[[2]], 
                                          lim_inf = -5, 
@@ -748,7 +748,7 @@ resultados_Y21 <- analizar_y_graficar_mw(n = 200,
                                          titulo_base = "Y21")
 ```
 
-```{r indep_2000_generacion_XY22}
+```{r indep_600_generacion_XY22}
 resultados_Y22 <- analizar_y_graficar_mw(n = 2000, 
                                          phi = 0, 
                                          mw_obj = mw_list[[2]], 

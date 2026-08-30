@@ -1,5 +1,5 @@
 ###############################################################################
-# Script Modificado: Estimacion_Densidades_y_MonteCarlo.R
+# Script: Estimacion_Densidades_y_MonteCarlo.R
 # Descripción: Integración de replicación individual, simulación Monte Carlo, 
 # método GL matricial y muestreo eficiente de Normal Truncada (Transformada Inversa).
 ###############################################################################
@@ -137,7 +137,10 @@ GL_matrix_estimator <- function(X, gridcal, H, V_H) {
   Criterio_Final <- sweep(Criterio_A_Matriz, MARGIN = 2, STATS = V_H, FUN = "+")
   indices_minimos <- max.col(-Criterio_Final, ties.method = "first")
   
-  return(Matriz_GH[cbind(1:length(gridcal), indices_minimos)])
+  densidad_estimada <- Matriz_GH[cbind(1:length(gridcal), indices_minimos)]
+  h_seleccionadas <- H[indices_minimos] # La ventana usada en cada punto
+  
+  return(list(densidad = densidad_estimada, h_local = h_seleccionadas))
 }
 
 
@@ -145,36 +148,69 @@ GL_matrix_estimator <- function(X, gridcal, H, V_H) {
 # 3. FUNCIONES DE DIAGNÓSTICO Y REPLICACIÓN INDIVIDUAL
 # =====================================================================
 
-plot_composite <- function(gridcal, y_teo, dens_nrd0, dens_ucv, dens_sj, dens_gl, 
+plot_composite <- function(X, gridcal, y_teo, dens_nrd0, h_nrd0, dens_ucv, h_ucv, dens_sj, h_sj, dens_gl, h_gl, 
                            err_nrd0, err_ucv, err_sj, err_gl, titulo) {
   
   layout(matrix(c(1, 2), nrow = 2, byrow = TRUE))
   par(mar = c(4, 4, 3, 1) + 0.1)
   
-  # --- Panel Superior: Densidades ---
+  # --- Panel Superior: Densidades con Histograma ---
   y_max <- max(c(y_teo, dens_nrd0, dens_ucv, dens_sj, dens_gl)) * 1.1
-  plot(gridcal, y_teo, type = "l", col = "black", lwd = 3, lty = 2,
-       ylim = c(0, y_max), xlab = "x", ylab = "Densidad", 
-       main = paste("Comparación de Estimadores -", titulo))
   
+  # 1. Dibujamos el histograma de fondo primero (prob = TRUE es crucial para que coincida con las densidades)
+  hist(X, prob = TRUE, breaks = 30, col = "gray90", border = "white",
+       xlim = range(gridcal), ylim = c(0, y_max), 
+       main = "", xlab = "x", ylab = "Densidad")
+  
+  # 2. Agregamos la densidad teórica (ahora con lines() en vez de plot())
+  lines(gridcal, y_teo, col = "black", lwd = 3, lty = 2)
+  
+  # 3. Agregamos el resto de las estimaciones
   lines(gridcal, dens_nrd0, col = "#0072B2", lwd = 2) 
   lines(gridcal, dens_ucv, col = "#D55E00", lwd = 2)  
   lines(gridcal, dens_sj, col = "#009E73", lwd = 2)   
-  lines(gridcal, dens_gl, col = "#CC79A7", lwd = 2)   
+  lines(gridcal, dens_gl, col = "blue", lwd = 2)   
   
-  legend("topright", legend = c("Teórica", "Silverman", "UCV", "S-J (Plug-in)", "GL"),
-         col = c("black", "#0072B2", "#D55E00", "#009E73", "#CC79A7"),
-         lty = c(2, 1, 1, 1, 1), lwd = c(3, 2, 2, 2, 2), bty = "n")
+  legend("topright", 
+         legend = as.expression(c(
+           bquote("Teórica"),
+           bquote("ROT (h = " * .(round(h_nrd0, 2)) * ")"),
+           bquote("UCV (h = " * .(round(h_ucv, 2)) * ")"),
+           bquote("SJ (h = " * .(round(h_sj, 2)) * ")"),
+           bquote("GL (" * hat(h) * " = " * .(round(h_gl, 4)) * ")")
+         )),
+         col = c("black", "#0072B2", "#D55E00", "#009E73", "blue"),
+         lty = c(2, 1, 1, 1, 1), 
+         lwd = c(3, 2, 2, 2, 2), 
+         bty = "n")
   
   # --- Panel Inferior: Error Cuadrático Local ---
   err_max <- max(c(err_nrd0, err_ucv, err_sj, err_gl))
-  plot(gridcal, err_gl, type = "l", col = "#CC79A7", lwd = 2,
-       ylim = c(0, err_max), xlab = "x", ylab = "Error Cuadrático",
-       main = "Error Cuadrático Local")
+  plot(gridcal, err_gl, type = "l", col = "blue", lwd = 2,
+       ylim = c(0, err_max), xlab = "x", ylab = "Error Cuadrático Local")
   
   lines(gridcal, err_nrd0, col = "#0072B2", lwd = 2)
   lines(gridcal, err_ucv, col = "#D55E00", lwd = 2)
   lines(gridcal, err_sj, col = "#009E73", lwd = 2)
+  
+  # === Cálculo del ISE para la leyenda ===
+  delta_x <- gridcal[2] - gridcal[1]
+  ise_nrd0 <- sum(err_nrd0) * delta_x
+  ise_ucv  <- sum(err_ucv) * delta_x
+  ise_sj   <- sum(err_sj) * delta_x
+  ise_gl   <- sum(err_gl) * delta_x
+  
+  legend("topright", 
+         legend = c( 
+           paste0("ROT (ISE = ", round(ise_nrd0, 4), ")"), 
+           paste0("UCV (ISE = ", round(ise_ucv, 4), ")"), 
+           paste0("SJ (ISE = ", round(ise_sj, 4), ")"), 
+           paste0("GL (ISE = ", round(ise_gl, 4), ")")
+         ),
+         col = c( "#0072B2", "#D55E00", "#009E73", "blue"),
+         lty = c(1, 1, 1, 1), 
+         lwd = c(2, 2, 2, 2), 
+         bty = "n")
   
   layout(1) 
 }
@@ -194,7 +230,9 @@ analizar_y_graficar_replicacion <- function(n, phi, tipo_densidad, mw_idx = 1,
   # 2. Configurar malla (Truncada utiliza malla fija [-4, 4] para consistencia general)
   lim_inf <- if(tipo_densidad == "truncnorm") -4 else min(X) - 1.5 * sd(X)
   lim_sup <- if(tipo_densidad == "truncnorm") 4 else max(X) + 1.5 * sd(X)
-  n_grid <- 512
+  # lim_inf <- -3
+  # lim_sup <- 3
+  n_grid <- 200
   
   # 3. Estimaciones Clásicas (Misma grilla forzada)
   d_nrd0 <- density(X, bw = "nrd0", from = lim_inf, to = lim_sup, n = n_grid)
@@ -208,7 +246,9 @@ analizar_y_graficar_replicacion <- function(n, phi, tipo_densidad, mw_idx = 1,
   u <- seq(0, floor(log(n)) * (2/3), by = 0.1)
   H <- exp(-u)
   V_H <- Vh_vectorizado(H, n, gsup, gamma_gl)
-  dens_gl <- GL_matrix_estimator(X, gridcal, H, V_H)
+  resultado_gl <- GL_matrix_estimator(X, gridcal, H, V_H)
+  dens_gl <- resultado_gl$densidad
+  h_gl_media <- mean(resultado_gl$h_local)
   
   # 5. Errores Cuadráticos e ISE
   y_teo <- info_muestra$y_teo_func(gridcal)
@@ -227,7 +267,7 @@ analizar_y_graficar_replicacion <- function(n, phi, tipo_densidad, mw_idx = 1,
   # 6. Gráfico Compuesto
   if (generar_plot) {
     titulo <- paste(toupper(tipo_densidad), "(n =", n, ", phi =", phi, ")")
-    plot_composite(gridcal, y_teo, d_nrd0$y, d_ucv$y, d_sj$y, dens_gl, 
+    plot_composite(X, gridcal, y_teo, d_nrd0$y, d_nrd0$bw, d_ucv$y, d_ucv$bw, d_sj$y, d_sj$bw, dens_gl, h_gl_media,
                    err_nrd0, err_ucv, err_sj, err_gl, titulo)
   }
   
@@ -282,8 +322,10 @@ ejecutar_montecarlo <- function(B = 1000, n = 200, phi = 0, tipo_densidad = "tru
 # =====================================================================
 
 # 1. Ejecutar una única replicación y graficar para Densidad Normal Truncada
-replicacion_unica <- analizar_y_graficar_replicacion(n = 60, phi = 0, tipo_densidad = "mezcla")
-print(replicacion_unica$ISE)
+# replicacion_unica <- analizar_y_graficar_replicacion(n = 60, phi = 0, tipo_densidad = "mezcla")
+# print(replicacion_unica$ISE)
+resultados_X11 <- analizar_y_graficar_replicacion(n = 60, phi = 0, tipo_densidad = "normal", gamma_gl = 0.05)
+resultados_X11
 
 # 2. Ejecutar Estudio Monte Carlo Completo usando las funciones modulares
 # res_mc_trunc <- ejecutar_montecarlo(B = 1000, n = 200, phi = 0.5, tipo_densidad = "truncnorm")
