@@ -1,6 +1,5 @@
 ###########################################################
-# Calibración de Gamma - Método GL (Riesgo Local)
-# VERSIÓN MATRICIAL ULTRA-RÁPIDA (Precomputación)
+# Calibración de Gamma para Mezcla - Método GL
 ###########################################################
 
 # Instalar y cargar matrixStats si no está disponible (esencial para velocidad)
@@ -8,15 +7,20 @@ if (!require(matrixStats)) install.packages("matrixStats", repos = "http://cran.
 library(parallel)
 library(matrixStats)
 
+# Establecer directorio actual en la ubicación del archivo de trabajo
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+directorio_salida <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 ###########################################################
 #                  Parámetros de Simulación
 ###########################################################
-n <- 250           # Tamaño de la muestra
-phi <- 0.8         # Coeficiente de autocorrelación AR(1)
-B <- 500           # Iteraciones de Monte Carlo
+n <- 120           # Tamaño de la muestra
+phi <- 0         # Coeficiente de autocorrelación AR(1)
+B <- 300           # Iteraciones de Monte Carlo
 
 # Selector dinámico de densidad
-densidad <- "lognormal" 
+densidad <- "mezcla" 
 
 # Cuadrícula fina para la búsqueda del parámetro gamma
 GAM <-c(seq(0.0025,0.0275,by=0.0025),seq(0.030,0.100,by=0.0025),seq(0.125,0.5,by=0.00625))
@@ -64,8 +68,12 @@ H <- exp(-u)
 ###########################################################
 #   Función de Penalización Vectorizada
 ###########################################################
-Vh_vectorizado <- function(H_vec, n, gsup, gamma) {
-  delta.n <- sqrt(log(n))
+Vh_vectorizado <- function(H_vec, n, gsup, gamma, phi) {
+  if  (phi == 0) {
+    delta.n <- 0
+  } else {
+    delta.n <- sqrt(log(n))
+  }
   K1 <- 1
   K2 <- sqrt(1 / (2 * sqrt(pi)))
   return(sqrt(2 * gamma * gsup) * K2 * (K1 + 1) * (1 + delta.n) * (((log(n))^(-1/2)) / sqrt(n * H_vec)))
@@ -86,7 +94,7 @@ Tiempo <- system.time({
     gamma_actual <- GAM[I]
     
     # Precalculamos V(h) una sola vez para este gamma (fuera del Monte Carlo)
-    V_H <- Vh_vectorizado(H, n, gsup, gamma_actual)
+    V_H <- Vh_vectorizado(H, n, gsup, gamma_actual, phi)
     
     run_monte_carlo <- function(b) {
       # 1. Generación AR(1) dependiente
@@ -186,49 +194,49 @@ mise_minimo <- MISE[idx_optimo]
 cat(sprintf("\n=> RESULTADO: El gamma óptimo estimado es %.3f (MISE = %.6f)\n", gamma_optimo, mise_minimo))
 cat("========================================\n")
 
-####################################################################
+###############################################################################
 if(n == 60 & phi==0) {
-  nombre_imagen <- "Resultados_Lognormal_n60_phi0.png"
+  nombre_imagen <- "Resultados_Mezcla_n60_phi0.png"
 } else if(n == 60 & phi==0.5) {
-  nombre_imagen <- "Resultados_Lognormal_n60_phi05.png"
+  nombre_imagen <- "Resultados_Mezcla_n60_phi05.png"
 } else if(n == 60 & phi==0.7) {
-  nombre_imagen <- "Resultados_Lognormal_n60_phi07.png"
+  nombre_imagen <- "Resultados_Mezcla_n60_phi07.png"
 } else if(n == 60 & phi==0.8) {
-  nombre_imagen <- "Resultados_Lognormal_n60_phi08.png"
+  nombre_imagen <- "Resultados_Mezcla_n60_phi08.png"
 } else if(n == 60 & phi==0.9) {
-  nombre_imagen <- "Resultados_Lognormal_n60_phi09.png"
+  nombre_imagen <- "Resultados_Mezcla_n60_phi09.png"
 } else if(n == 120 & phi==0) {
-  nombre_imagen <- "Resultados_Lognormal_n120_phi0.png"
+  nombre_imagen <- "Resultados_Mezcla_n120_phi0.png"
 } else if(n == 120 & phi==0.5) {
-  nombre_imagen <- "Resultados_Lognormal_n120_phi05.png"
+  nombre_imagen <- "Resultados_Mezcla_n120_phi05.png"
 } else if(n == 120 & phi==0.7) {
-  nombre_imagen <- "Resultados_Lognormal_n120_phi07.png"
+  nombre_imagen <- "Resultados_Mezcla_n120_phi07.png"
 } else if(n == 120 & phi==0.8) {
-  nombre_imagen <- "Resultados_Lognormal_n120_phi08.png"
+  nombre_imagen <- "Resultados_Mezcla_n120_phi08.png"
 } else if(n == 120 & phi==0.9) {
-  nombre_imagen <- "Resultados_Lognormal_n120_phi09.png"
+  nombre_imagen <- "Resultados_Mezcla_n120_phi09.png"
 } else if(n == 250 & phi==0) {
-  nombre_imagen <- "Resultados_Lognormal_n250_phi0.png"
+  nombre_imagen <- "Resultados_Mezcla_n250_phi0.png"
 } else if(n == 250 & phi==0.5) {
-  nombre_imagen <- "Resultados_Lognormal_n250_phi05.png"
+  nombre_imagen <- "Resultados_Mezcla_n250_phi05.png"
 } else if(n == 250 & phi==0.7) {
-  nombre_imagen <- "Resultados_Lognormal_n250_phi07.png"
+  nombre_imagen <- "Resultados_Mezcla_n250_phi07.png"
 } else if(n == 250 & phi==0.8) {
-  nombre_imagen <- "Resultados_Lognormal_n250_phi08.png"
+  nombre_imagen <- "Resultados_Mezcla_n250_phi08.png"
 }else if(n == 250 & phi==0.9) {
-  nombre_imagen <- "Resultados_Lognormal_n250_phi09.png"
+  nombre_imagen <- "Resultados_Mezcla_n250_phi09.png"
 }else {
-  nombre_imagen <- "Resultados_Lognormal.png"
+  nombre_imagen <- "Resultados_Mezcla.png"
 }
 
-directorio_salida <- "/home/abrahan/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study"
 
 png(
   filename = file.path(directorio_salida, nombre_imagen),
-  width = 961,
-  height = 485,
+  width = 1500,
+  height = 500,
   res = 120
 )
+
 plot(GAM, MISE, type = "b", pch = 19, col = "darkblue", lwd = 2,
      xlab = expression(gamma), ylab = "MISE (Error Cuadrático Medio Integrado)",
      # main = bquote("Optimización Matricial:" ~ gamma ~ "en GL (AR(1) phi="*.(phi)*" y n="*.(n)*")"),
@@ -253,35 +261,35 @@ Resultados <- list(GAM = GAM,MISE = MISE, GAM_OPT = gamma_optimo,
 # Resultados
 ###########################################################
 if(n == 60 & phi==0) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi0.RData")
+  save(Resultados,file = "Resultados_Mezcla_n60_phi0.RData")
 } else if(n == 60 & phi==0.5) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi05.RData")
+  save(Resultados,file = "Resultados_Mezcla_n60_phi05.RData")
 } else if(n == 60 & phi==0.7) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi07.RData")
+  save(Resultados,file = "Resultados_Mezcla_n60_phi07.RData")
 } else if(n == 60 & phi==0.8) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi08.RData")
+  save(Resultados,file = "Resultados_Mezcla_n60_phi08.RData")
 } else if(n == 60 & phi==0.9) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi09.RData")
+  save(Resultados,file = "Resultados_Mezcla_n60_phi09.RData")
 } else if(n == 120 & phi==0) {
-  save(Resultados,file = "Resultados_Lognormal_n120_phi0.RData")
+  save(Resultados,file = "Resultados_Mezcla_n120_phi0.RData")
 } else if(n == 120 & phi==0.5) {
-  save(Resultados,file = "Resultados_Lognormal_n120_phi05.RData")
+  save(Resultados,file = "Resultados_Mezcla_n120_phi05.RData")
 } else if(n == 120 & phi==0.7) {
-  save(Resultados,file = "Resultados_Lognormal_n120_phi07.RData")
+  save(Resultados,file = "Resultados_Mezcla_n120_phi07.RData")
 } else if(n == 120 & phi==0.8) {
-  save(Resultados,file = "Resultados_Lognormal_n120_phi08.RData")
+  save(Resultados,file = "Resultados_Mezcla_n120_phi08.RData")
 } else if(n == 120 & phi==0.9) {
-  save(Resultados,file = "Resultados_Lognormal_n120_phi09.RData")
+  save(Resultados,file = "Resultados_Mezcla_n120_phi09.RData")
 } else if(n == 250 & phi==0) {
-  save(Resultados,file = "Resultados_Lognormal_n250_phi0.RData")
+  save(Resultados,file = "Resultados_Mezcla_n250_phi0.RData")
 } else if(n == 250 & phi==0.5) {
-  save(Resultados,file = "Resultados_Lognormal_n250_phi05.RData")
+  save(Resultados,file = "Resultados_Mezcla_n250_phi05.RData")
 } else if(n == 250 & phi==0.7) {
-  save(Resultados,file = "Resultados_Lognormal_n250_phi07.RData")
+  save(Resultados,file = "Resultados_Mezcla_n250_phi07.RData")
 } else if(n == 250 & phi==0.8) {
-  save(Resultados,file = "Resultados_Lognormal_n250_phi08.RData")
-}else if(n == 250 & phi==0.9) {
-  save(Resultados,file = "Resultados_Lognormal_n250_phi09.RData")
+  save(Resultados,file = "Resultados_Mezcla_n250_phi08.RData")
+} else if(n == 250 & phi==0.9) {
+  save(Resultados,file = "Resultados_Mezcla_n250_phi09.RData")
 }else {
-  save(Resultados,file = "Resultados_Lognormal.RData")
+  save(Resultados,file = "Resultados_Mezcla.RData")
 }
