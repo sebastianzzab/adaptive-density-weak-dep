@@ -584,7 +584,7 @@ rownames(df_final_mse) <- NULL # Limpiar nombres de fila
 if (!require(writexl)) install.packages("writexl")
 library(writexl)
 
-setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/Nuevo")
+setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/simulations/Resultados")
 
 # 1. Guardar tablas en Excel
 ruta_xlsx <- "mise_simulacion_lognorm_gamma_n60.xlsx"

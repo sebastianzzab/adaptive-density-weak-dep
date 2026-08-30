@@ -14,7 +14,7 @@ library(tidyr)
 library(dplyr)
 
 # Directorio donde guardaste los Excel
-setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/Nuevo")
+setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/simulations/Resultados")
 
 # =====================================================================
 # 2. IMPORTACIÓN Y CONSOLIDACIÓN DE DATOS (MISE y MSE)
@@ -22,9 +22,9 @@ setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_s
 
 # A) Lectura de archivos MISE (Inyectamos la columna 'n' de forma segura con mutate)
 cat("Importando archivos MISE...\n")
-mise_n60  <- read_excel("mise_simulacion_norm_laplace_n60.xlsx") %>% mutate(n = 60)
-mise_n120 <- read_excel("mise_simulacion_norm_laplace_n120.xlsx") %>% mutate(n = 120)
-mise_n250 <- read_excel("mise_simulacion_norm_laplace_n250.xlsx") %>% mutate(n = 250)
+mise_n60  <- read_excel("mise_simulacion_lognorm_gamma_n60.xlsx") %>% mutate(n = 60)
+mise_n120 <- read_excel("mise_simulacion_lognorm_gamma_n120.xlsx") %>% mutate(n = 120)
+mise_n250 <- read_excel("mise_simulacion_lognorm_gamma_n250.xlsx") %>% mutate(n = 250)
 
 # Variables con nombres muy distintos para evitar confusiones
 tabla_global_mise <- bind_rows(
@@ -35,9 +35,9 @@ tabla_global_mise <- bind_rows(
 
 # B) Lectura de archivos MSE Puntual (Inyectamos la columna 'n')
 cat("Importando archivos MSE Puntual...\n")
-mse_n60  <- read_excel("mse_simulacion_norm_laplace_n60.xlsx") %>% mutate(n = 60)
-mse_n120 <- read_excel("mse_simulacion_norm_laplace_n120.xlsx") %>% mutate(n = 120)
-mse_n250 <- read_excel("mse_simulacion_norm_laplace_n250.xlsx") %>% mutate(n = 250)
+mse_n60  <- read_excel("mse_simulacion_lognorm_gamma_n60.xlsx") %>% mutate(n = 60)
+mse_n120 <- read_excel("mse_simulacion_lognorm_gamma_n120.xlsx") %>% mutate(n = 120)
+mse_n250 <- read_excel("mse_simulacion_lognorm_gamma_n250.xlsx") %>% mutate(n = 250)
 
 tabla_puntual_mse <- bind_rows(
   mse_n60, 
@@ -130,10 +130,10 @@ generar_grafico_mse_puntual <- function(df_mse, nombre_densidad) {
 # =====================================================================
 # 4. EJECUCIÓN DE GRÁFICOS
 # =====================================================================
-cat("\nGenerando gráficos para Normal (3,1)...\n")
-generar_grafico_mise(tabla_global_mise, "Normal")
-generar_grafico_mse_puntual(tabla_puntual_mse, "Normal")
+cat("\nGenerando gráficos para Lognormal...\n")
+generar_grafico_mise(tabla_global_mise, "Lognormal")
+generar_grafico_mse_puntual(tabla_puntual_mse, "Lognormal")
 
-cat("\nGenerando gráficos para Laplace...\n")
-generar_grafico_mise(tabla_global_mise, "Laplace")
-generar_grafico_mse_puntual(tabla_puntual_mse, "Laplace")
+cat("\nGenerando gráficos para Gamma...\n")
+generar_grafico_mise(tabla_global_mise, "Gamma")
+generar_grafico_mse_puntual(tabla_puntual_mse, "Gamma")

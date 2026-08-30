@@ -1,10 +1,10 @@
 ###############################################################################
-# Script: Estudio de simulación: Caso Lognormal y Gamma con n=250
+# Script: Estudio de simulación: Caso Normal y Laplace con n=250
 # Realizado por: Sebastian Zabala
 # Fecha: Septiembre 2026
 ###############################################################################
 
-setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/PRP_Lognormal")
+setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/PRP_Normal")
 
 # Instalación de paquetes necesarios
 if (!require(matrixStats)) install.packages("matrixStats")
@@ -41,6 +41,7 @@ QMix <- function(u) { approx(x = grid.mix.u, y = grid.mix.x, xout = u, rule = 2)
 
 # Generación de variables uniformes bajo dependencia AR(1)
 generar_uniformes_ar1 <- function(nsim, phi, me = 0, de = 1) {
+  
   if (phi == 0) {
     Z <- rnorm(nsim)
   } else {
@@ -50,7 +51,9 @@ generar_uniformes_ar1 <- function(nsim, phi, me = 0, de = 1) {
   return(pnorm(Z, mean = 0, sd = sd_Z))
 }
 
-# Generador para Normal Truncada mediante Transformada Inversa
+# ---------------------------------------------------------------------
+# Generador eficiente para Normal Truncada (Transformada Inversa)
+# ---------------------------------------------------------------------
 generar_truncnorm_dep <- function(n, phi, a, b, m = 0, de = 1) {
   U <- generar_uniformes_ar1(nsim = n, phi = phi)
   
@@ -171,7 +174,7 @@ generar_muestra <- function(n, phi, tipo, mw_idx = 1, a = -2, b = 2, me = 0, de 
 }
 
 # =====================================================================
-# OBTENCIÓN DE PUNTOS CRÍTICOS TEÓRICOS
+# OBTENCIÓN DE PUNTOS CRÍTICOS TEÓRICOS PARA MSE(x)
 # =====================================================================
 
 obtener_puntos_evaluacion <- function(tipo, mw_idx = 1, me = 0, de = 1) {
@@ -361,7 +364,7 @@ evaluar_muestra_completa <- function(n, phi, tipo_densidad, mw_idx = 1, gamma_gl
   
   # 2. DEFINICIÓN DE LAS DOS MALLAS DE EVALUACIÓN
   # A) Malla Global
-  lim_inf <- 0 ; lim_sup <- qlnorm(0.999999, 0, 0.5); n_grid <- 200
+  lim_inf <- info_muestra$lim_inf; lim_sup <- info_muestra$lim_sup; n_grid <- 200
   grid_global <- seq(lim_inf, lim_sup, length.out = n_grid)
   delta_x <- grid_global[2] - grid_global[1]
   y_teo_global <- y_teo_func(grid_global)
@@ -376,7 +379,7 @@ evaluar_muestra_completa <- function(n, phi, tipo_densidad, mw_idx = 1, gamma_gl
   d_ucv  <- tryCatch({ suppressWarnings(density(X, bw = "ucv", from = lim_inf, to = lim_sup, n = n_grid))
   }, error = function(e) return(d_nrd0))
   
-  # 4. EXTRACCIÓN PUNTUAL CLÁSICA (Usando Estimador Exacto)
+  # 4. EXTRACCIÓN PUNTUAL CLÁSICA
   # Extraemos las ventanas (h) calculadas por las reglas clásicas
   h_nrd0 <- d_nrd0$bw
   h_ucv  <- d_ucv$bw
@@ -440,7 +443,7 @@ ejecutar_montecarlo <- function(B = 1000, n = 250, phi = 0, tipo_densidad = "log
   on.exit({ stopCluster(cl); closeAllConnections() }, add = TRUE)
   registerDoParallel(cl)
   
-  cat(sprintf("Iniciando Monte Carlo  (%d iter). Densidad: %s\n", B, tipo_densidad))
+  cat(sprintf("Iniciando Monte Carlo Consolidado (%d iter). Densidad: %s\n", B, tipo_densidad))
   
   # Ejecutamos las B réplicas (.combine = 'list' para guardar resultados complejos)
   resultados_mc <- foreach(m = 1:B, .packages = c("stats", "matrixStats", "nor1mix"),
@@ -480,19 +483,19 @@ ejecutar_montecarlo <- function(B = 1000, n = 250, phi = 0, tipo_densidad = "log
 ############################################################################
 
 # 1. Cargar los gammas precalculados ANTES de ejecutar los escenarios
-load("Resultados_PRP_Lognormal_n250.RData")
+load("Resultados_PRP_Normal_n250.RData")
 
 # 2. Definir el diseño experimental
 niveles_phi <- c(0, 0.5, 0.9)
-distribuciones <- c("lognormal", "gamma")
+distribuciones <- c("normal", "laplace")
 
 # Función auxiliar para mapear el phi con el gamma cargado desde el .RData
 obtener_gamma <- function(phi) {
   phi_str <- as.character(round(phi, 2))
   
-  if(phi_str == "0")    return(Resultados_PRP_Lognormal_n250$gam.phi0)
-  if(phi_str == "0.5")  return(Resultados_PRP_Lognormal_n250$gam.phi05)
-  if(phi_str == "0.9")  return(Resultados_PRP_Lognormal_n250$gam.phi09)
+  if(phi_str == "0")    return(Resultados_PRP_Normal_n250$gam.phi0)
+  if(phi_str == "0.5")  return(Resultados_PRP_Normal_n250$gam.phi05)
+  if(phi_str == "0.9")  return(Resultados_PRP_Normal_n250$gam.phi09)
   
   stop(paste("Error crítico: No se encontró un gamma calibrado para phi =", phi))
 }
@@ -500,7 +503,7 @@ obtener_gamma <- function(phi) {
 # 3. Ejecutar el bucle sobre la grilla de parámetros
 resultados_lista <- list()     # LISTA PARA EL MISE
 resultados_mse_lista <- list() # LISTA PARA EL MSE
-resultados_muestras_lista <- list() # LISTA PARA GUARDAR LAS MATRICES DE DATOS
+resultados_muestras_lista <- list() # LISTA PARA GUARDAR LAS MATRICES DE DATOS 
 resultados_anova_lista <- list() # LISTA PARA EL ANOVA
 fila <- 1
 
@@ -585,19 +588,19 @@ rownames(df_final_mse) <- NULL # Limpiar nombres de fila
 if (!require(writexl)) install.packages("writexl")
 library(writexl)
 
-setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/Nuevo")
+setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/simulations/Resultados")
 
 # 1. Guardar tablas en Excel
-ruta_xlsx <- "mise_simulacion_lognorm_gamma_n250.xlsx"
+ruta_xlsx <- "mise_simulacion_norm_laplace_n250.xlsx"
 write_xlsx(df_final_mise, path = ruta_xlsx)
 cat("Archivo XLSX guardado en:", file.path(getwd(), ruta_xlsx), "\n")
 
-ruta_xlsx2 <- "mse_simulacion_lognorm_gamma_n250.xlsx"
+ruta_xlsx2 <- "mse_simulacion_norm_laplace_n250.xlsx"
 write_xlsx(df_final_mse, path = ruta_xlsx2)
 cat("Archivo XLSX guardado en:", file.path(getwd(), ruta_xlsx2), "\n")
 
 # 2. Guardar las muestras generadas en RData
-ruta_muestras <- "muestras_generadas_lognorm_gamma_n250.RData"
+ruta_muestras <- "muestras_generadas_norm_laplace_n250.RData"
 save(resultados_muestras_lista, file = ruta_muestras)
 
 cat("Archivos de resultados (XLSX) y Muestras (RData) guardados exitosamente en:\n", getwd(), "\n")
@@ -605,7 +608,7 @@ cat("Archivos de resultados (XLSX) y Muestras (RData) guardados exitosamente en:
 # =====================================================================
 # GUARDADO DE MATRICES PARA ANOVA
 # =====================================================================
-ruta_anova <- "matrices_ise_anova_lognorm_gamma_n250.RData"
+ruta_anova <- "matrices_ise_anova_norm_laplace_n250.RData"
 save(resultados_anova_lista, file = ruta_anova)
 cat("Matrices para ANOVA guardadas en:", file.path(getwd(), ruta_anova), "\n")
 

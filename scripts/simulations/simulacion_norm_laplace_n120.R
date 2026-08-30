@@ -1,5 +1,5 @@
 ###############################################################################
-# Script: Estudio de simulación: Caso Normal y Laplace con n=250
+# Script: Estudio de simulación: Caso Normal y Laplace con n=120
 # Realizado por: Sebastian Zabala
 # Fecha: Septiembre 2026
 ###############################################################################
@@ -435,7 +435,7 @@ evaluar_muestra_completa <- function(n, phi, tipo_densidad, mw_idx = 1, gamma_gl
 # ESTUDIO DE SIMULACIÓN MONTE CARLO (B = 1000)
 # =====================================================================
 
-ejecutar_montecarlo <- function(B = 1000, n = 250, phi = 0, tipo_densidad = "lognormal", mw_idx = 1, gamma_gl = 0.05, me = 0, de = 1) {
+ejecutar_montecarlo <- function(B = 1000, n = 120, phi = 0, tipo_densidad = "lognormal", mw_idx = 1, gamma_gl = 0.05, me = 0, de = 1) {
   
   # Crear el clúster dejando núcleos libres para el sistema operativo
   num_cores <- max(1, parallel::detectCores() - 2)
@@ -483,7 +483,7 @@ ejecutar_montecarlo <- function(B = 1000, n = 250, phi = 0, tipo_densidad = "log
 ############################################################################
 
 # 1. Cargar los gammas precalculados ANTES de ejecutar los escenarios
-load("Resultados_PRP_Normal_n250.RData")
+load("Resultados_PRP_Normal_n120.RData")
 
 # 2. Definir el diseño experimental
 niveles_phi <- c(0, 0.5, 0.9)
@@ -493,9 +493,9 @@ distribuciones <- c("normal", "laplace")
 obtener_gamma <- function(phi) {
   phi_str <- as.character(round(phi, 2))
   
-  if(phi_str == "0")    return(Resultados_PRP_Normal_n250$gam.phi0)
-  if(phi_str == "0.5")  return(Resultados_PRP_Normal_n250$gam.phi05)
-  if(phi_str == "0.9")  return(Resultados_PRP_Normal_n250$gam.phi09)
+  if(phi_str == "0")    return(Resultados_PRP_Normal_n120$gam.phi0)
+  if(phi_str == "0.5")  return(Resultados_PRP_Normal_n120$gam.phi05)
+  if(phi_str == "0.9")  return(Resultados_PRP_Normal_n120$gam.phi09)
   
   stop(paste("Error crítico: No se encontró un gamma calibrado para phi =", phi))
 }
@@ -508,7 +508,7 @@ resultados_anova_lista <- list() # LISTA PARA EL ANOVA
 fila <- 1
 
 # Fijamos el tamaño de muestra
-n_actual <- 250
+n_actual <- 120
 
 for (phi_actual in niveles_phi) {
   gamma_actual <- obtener_gamma(phi_actual)
@@ -516,7 +516,7 @@ for (phi_actual in niveles_phi) {
   for (dist_actual in distribuciones) {
     
     # Ejecutamos el Monte Carlo para la combinación actual
-    res <- ejecutar_montecarlo(B = 1000, n = 250, phi = phi_actual, 
+    res <- ejecutar_montecarlo(B = 1000, n = 120, phi = phi_actual, 
                                tipo_densidad = dist_actual, 
                                me = 3, de = 1, 
                                gamma_gl = gamma_actual)
@@ -588,19 +588,19 @@ rownames(df_final_mse) <- NULL # Limpiar nombres de fila
 if (!require(writexl)) install.packages("writexl")
 library(writexl)
 
-setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/calibration_study/Nuevo")
+setwd("~/Desktop/tesis_sebastian/adaptive-density-weak-dep/scripts/simulations/Resultados")
 
 # 1. Guardar tablas en Excel
-ruta_xlsx <- "mise_simulacion_norm_laplace_n250.xlsx"
+ruta_xlsx <- "mise_simulacion_norm_laplace_n120.xlsx"
 write_xlsx(df_final_mise, path = ruta_xlsx)
 cat("Archivo XLSX guardado en:", file.path(getwd(), ruta_xlsx), "\n")
 
-ruta_xlsx2 <- "mse_simulacion_norm_laplace_n250.xlsx"
+ruta_xlsx2 <- "mse_simulacion_norm_laplace_n120.xlsx"
 write_xlsx(df_final_mse, path = ruta_xlsx2)
 cat("Archivo XLSX guardado en:", file.path(getwd(), ruta_xlsx2), "\n")
 
 # 2. Guardar las muestras generadas en RData
-ruta_muestras <- "muestras_generadas_norm_laplace_n250.RData"
+ruta_muestras <- "muestras_generadas_norm_laplace_n120.RData"
 save(resultados_muestras_lista, file = ruta_muestras)
 
 cat("Archivos de resultados (XLSX) y Muestras (RData) guardados exitosamente en:\n", getwd(), "\n")
@@ -608,7 +608,7 @@ cat("Archivos de resultados (XLSX) y Muestras (RData) guardados exitosamente en:
 # =====================================================================
 # GUARDADO DE MATRICES PARA ANOVA
 # =====================================================================
-ruta_anova <- "matrices_ise_anova_norm_laplace_n250.RData"
+ruta_anova <- "matrices_ise_anova_norm_laplace_n120.RData"
 save(resultados_anova_lista, file = ruta_anova)
 cat("Matrices para ANOVA guardadas en:", file.path(getwd(), ruta_anova), "\n")
 
