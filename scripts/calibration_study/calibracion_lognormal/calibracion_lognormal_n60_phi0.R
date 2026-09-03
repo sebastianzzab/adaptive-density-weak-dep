@@ -190,6 +190,8 @@ cat("========================================\n")
 ####################################################################
 if(n == 60 & phi==0) {
   nombre_imagen <- "Resultados_Lognormal_n60_phi0.png"
+} else if(n == 60 & phi==0.3) {
+  nombre_imagen <- "Resultados_Lognormal_n60_phi03.png"
 } else if(n == 60 & phi==0.5) {
   nombre_imagen <- "Resultados_Lognormal_n60_phi05.png"
 } else if(n == 60 & phi==0.7) {
@@ -200,6 +202,8 @@ if(n == 60 & phi==0) {
   nombre_imagen <- "Resultados_Lognormal_n60_phi09.png"
 } else if(n == 120 & phi==0) {
   nombre_imagen <- "Resultados_Lognormal_n120_phi0.png"
+} else if(n == 120 & phi==0.3) {
+  nombre_imagen <- "Resultados_Lognormal_n120_phi03.png"
 } else if(n == 120 & phi==0.5) {
   nombre_imagen <- "Resultados_Lognormal_n120_phi05.png"
 } else if(n == 120 & phi==0.7) {
@@ -210,6 +214,8 @@ if(n == 60 & phi==0) {
   nombre_imagen <- "Resultados_Lognormal_n120_phi09.png"
 } else if(n == 250 & phi==0) {
   nombre_imagen <- "Resultados_Lognormal_n250_phi0.png"
+} else if(n == 250 & phi==0.3) {
+  nombre_imagen <- "Resultados_Lognormal_n250_phi03.png"
 } else if(n == 250 & phi==0.5) {
   nombre_imagen <- "Resultados_Lognormal_n250_phi05.png"
 } else if(n == 250 & phi==0.7) {
@@ -255,6 +261,8 @@ Resultados <- list(GAM = GAM,MISE = MISE, GAM_OPT = gamma_optimo,
 ###########################################################
 if(n == 60 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n60_phi0.RData")
+} else if(n == 60 & phi==0.3) {
+  save(Resultados,file = "Resultados_Lognormal_n60_phi03.RData")
 } else if(n == 60 & phi==0.5) {
   save(Resultados,file = "Resultados_Lognormal_n60_phi05.RData")
 } else if(n == 60 & phi==0.7) {
@@ -265,6 +273,8 @@ if(n == 60 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n60_phi09.RData")
 } else if(n == 120 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n120_phi0.RData")
+} else if(n == 120 & phi==0.3) {
+  save(Resultados,file = "Resultados_Lognormal_n120_phi03.RData")
 } else if(n == 120 & phi==0.5) {
   save(Resultados,file = "Resultados_Lognormal_n120_phi05.RData")
 } else if(n == 120 & phi==0.7) {
@@ -275,6 +285,8 @@ if(n == 60 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n120_phi09.RData")
 } else if(n == 250 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n250_phi0.RData")
+} else if(n == 250 & phi==0.3) {
+  save(Resultados,file = "Resultados_Lognormal_n250_phi03.RData")
 } else if(n == 250 & phi==0.5) {
   save(Resultados,file = "Resultados_Lognormal_n250_phi05.RData")
 } else if(n == 250 & phi==0.7) {
