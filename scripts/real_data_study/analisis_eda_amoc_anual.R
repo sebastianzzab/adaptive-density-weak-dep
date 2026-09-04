@@ -20,6 +20,30 @@
 # -----------------------------
 # 1. Configuracion
 # -----------------------------
+library(readxl)#importar hojas de Excel a R#
+library(aTSA) #análisis detallados de series temporales
+library(astsa)
+library(car)
+library(lubridate)
+library(vars)
+library(tseries)#permitirá manipular datos correspondiente a series temporale#
+library(foreign)#sirve para importar datos en diveros formatos#
+library(quantmod)#unciones para la descarga, manipulación, visualización y construcción de modelos con datos financieros#
+library(forecast)# Contiene el modelo ARIMA
+library(tseries) #Para series de tiempo
+library(TSA)     #Para series de tiempo
+library(urca)    #Para hacer el Test de Raiz Unitaria (detectar hay o no estacionariedad)
+library(ggplot2) #Para hacer gráficos
+library(dplyr)   #Para la manipulación de datos (filtrar, seleccionar, agregar, transformar)#
+library(stats)   #Se usa para diversas pruebas estadísticas (medias,varianza, arima,etc)#
+library(lmtest)
+library(mFilter)
+library(dynlm)
+library(nlme)
+library(NTS)
+library(broom)
+library(rugarch)
+
 
 archivo_entrada <- "AMOC_Proxy_SubpolarGyre_HadISST.csv"
 directorio_salida <- "salidas_eda_amoc"
@@ -61,11 +85,11 @@ names(serie_anual)[names(serie_anual) == "amoc_proxy_sst"] <- "promedio_anual"
 serie_anual <- serie_anual[order(serie_anual$year), ]
 rownames(serie_anual) <- NULL
 
-write.csv(
-  serie_anual,
-  file.path(directorio_salida, "serie_AMOC_promedio_anual.csv"),
-  row.names = FALSE
-)
+# write.csv(
+#   serie_anual,
+#   file.path(directorio_salida, "serie_AMOC_promedio_anual.csv"),
+#   row.names = FALSE
+# )
 
 # Serie temporal anual regular
 serie_ts <- ts(
@@ -116,34 +140,62 @@ estadisticas_descriptivas <- data.frame(
 
 print(estadisticas_descriptivas)
 
-write.csv(
-  estadisticas_descriptivas,
-  file.path(directorio_salida, "estadisticas_descriptivas_AMOC_anual.csv"),
-  row.names = FALSE
-)
+# write.csv(
+#   estadisticas_descriptivas,
+#   file.path(directorio_salida, "estadisticas_descriptivas_AMOC_anual.csv"),
+#   row.names = FALSE
+# )
 
 # -----------------------------
 # 4. Grafico de la serie observada
 # -----------------------------
 
-png(
-  filename = file.path(directorio_salida, "01_serie_observada_anual.png"),
-  width = 1200,
-  height = 700,
-  res = 120
-)
-plot(
-  serie_ts,
-  type = "o",
-  pch = 16,
-  cex = 0.55,
-  col = "steelblue4",
-  # main = "Serie observada - promedio anual",
-  xlab = "Año",
-  ylab = "AMOC proxy SST"
-)
-grid()
-dev.off()
+# png(
+#   filename = file.path(directorio_salida, "01_serie_observada_anual.png"),
+#   width = 1200,
+#   height = 700,
+#   res = 120
+# )
+# plot(
+#   serie_ts,
+#   type = "o",
+#   pch = 16,
+#   cex = 0.55,
+#   col = "steelblue4",
+#   # main = "Serie observada - promedio anual",
+#   xlab = "Año",
+#   ylab = "AMOC proxy SST"
+# )
+# grid()
+# dev.off()
+
+plot(serie_ts, type = "o", pch = 16, cex = 0.55,
+  col = "steelblue4",# main = "Serie observada - promedio anual",
+  xlab = "Año", ylab = "AMOC proxy SST")
+acf(serie_ts)
+pacf(serie_ts)
+ndiffs(x = serie_ts) # 1
+par(mfrow = c(1, 2))
+plot(serie_ts, type = "o", pch = 16, cex = 0.55,
+     col = "steelblue4",# main = "Serie observada - promedio anual",
+     xlab = "Año", ylab = "AMOC proxy SST")
+plot(diff(serie_ts, 1), type = "o", pch = 16, cex = 0.55, 
+     col = "steelblue4", xlab = "Año", ylab = "AMOC proxy SST diferenciada")
+par(mfrow = c(1, 1))
+# decompose(serie_ts)
+
+mmodelo <- auto.arima(x = serie_ts)
+mmodelo # ARIMA(2,1,2)
+
+# Realizar prueba de raíz unitaria#
+#H0: Serie No estacionaria: Hay raiz unitaria H1: Serie Estacionaria: No hay raiz unitaria#
+adf.test(serie_ts) # p-value = 0.3228
+adf.test(diff(serie_ts,1)) # p-value = 0.01
+#Se aplica la regla del P-valor y se concluye que la serie es estacionaria en media#
+diff_serie_ts <- diff(serie_ts, diff=1)
+
+acf(diff_serie_ts, lag.max = 60)
+pacf(diff_serie_ts, lag.max = 60)
 
 # -----------------------------
 # 5. Descomposicion aditiva
@@ -175,18 +227,18 @@ descomposicion <- data.frame(
   irregular = componente_irregular
 )
 
-write.csv(
-  descomposicion,
-  file.path(directorio_salida, "descomposicion_AMOC_anual.csv"),
-  row.names = FALSE
-)
-
-png(
-  filename = file.path(directorio_salida, "02_descomposicion_AMOC_anual.png"),
-  width = 1200,
-  height = 1000,
-  res = 120
-)
+# write.csv(
+#   descomposicion,
+#   file.path(directorio_salida, "descomposicion_AMOC_anual.csv"),
+#   row.names = FALSE
+# )
+# 
+# png(
+#   filename = file.path(directorio_salida, "02_descomposicion_AMOC_anual.png"),
+#   width = 1200,
+#   height = 1000,
+#   res = 120
+# )
 
 par(mfrow = c(4, 1), mar = c(3, 4, 2, 1))
 
@@ -199,7 +251,7 @@ plot(
   xlab = "",
   ylab = "Valor"
 )
-grid()
+#grid()
 
 plot(
   descomposicion$year,
@@ -211,7 +263,7 @@ plot(
   xlab = "",
   ylab = "Valor"
 )
-grid()
+#grid()
 
 plot(
   descomposicion$year,
@@ -223,7 +275,7 @@ plot(
   ylab = "Valor"
 )
 abline(h = 0, lty = 2)
-grid()
+#grid()
 
 plot(
   descomposicion$year,
@@ -235,21 +287,21 @@ plot(
   ylab = "Residuo"
 )
 abline(h = 0, lty = 2)
-grid()
+#grid()
 
 par(mfrow = c(1, 1))
-dev.off()
+#dev.off()
 
 # -----------------------------
 # 6. Histograma de la serie anual
 # -----------------------------
 
-png(
-  filename = file.path(directorio_salida, "03_histograma_AMOC_anual.png"),
-  width = 1000,
-  height = 700,
-  res = 120
-)
+# png(
+#   filename = file.path(directorio_salida, "03_histograma_AMOC_anual.png"),
+#   width = 1000,
+#   height = 700,
+#   res = 120
+# )
 
 hist(
   serie_anual$promedio_anual,
@@ -275,8 +327,8 @@ legend(
   lty = 2,
   bty = "n"
 )
-grid()
-dev.off()
+#grid()
+#dev.off()
 
 # -----------------------------
 # 7. Salida resumida en consola

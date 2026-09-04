@@ -8,9 +8,9 @@ library(parallel)
 ###########################################################
 #                  Parámetros de Simulación
 ###########################################################
-n <- 60           # Tamaño de la muestra
+n <- 120           # Tamaño de la muestra
 phi <- 0.9         # Coeficiente de autocorrelación AR(1)
-B <- 300         # Iteraciones de Monte Carlo
+# B <- 300         # Iteraciones de Monte Carlo
 
 # Selector dinámico de densidad ("normal", "lognormal" o "mezcla")
 densidad <- "mezcla" 
@@ -34,15 +34,15 @@ QMix <- function(u) {
 ###########################################################
 if(densidad == "normal") {
   gsup <- 1/sqrt(2*pi)
-  gridcal <- seq(-8, 8, length=200) 
+  gridcal <- seq(-8, 8, length=100) 
   g.real <- dnorm(gridcal)
 } else if(densidad == "lognormal") {
   gsup <- exp(0.125)/(0.5*sqrt(2*pi))
-  gridcal <- seq(0, qlnorm(0.999999, 0, 0.5), length=200) 
+  gridcal <- seq(0, qlnorm(0.999999, 0, 0.5), length=100) 
   g.real <- dlnorm(gridcal, meanlog=0, sdlog=0.5)
 } else if(densidad == "mezcla") {
   gsup <- 0.5*dnorm(-2, -2, 1) + 0.5*dnorm(-2, 2, 1)
-  gridcal <- seq(-8, 8, length=200) 
+  gridcal <- seq(-8, 8, length=100) 
   g.real <- 0.5*dnorm(gridcal, -2, 1) + 0.5*dnorm(gridcal, 2, 1)
 } else {
   stop("Densidad no implementada")
@@ -51,7 +51,10 @@ if(densidad == "normal") {
 Delta <- diff(gridcal)[1]
 
 # Cuadrícula fina para la búsqueda del parámetro gamma
-GAM <- seq(0.05, 3.0, by = 0.025)
+# GAM <- seq(0.05, 3.0, by = 0.025)
+GAM <-c(seq(0.0025,0.0275,by=0.0025),seq(0.030,0.100,by=0.0025),seq(0.125,0.5,by=0.0125))
+# Esta malla de GAM tiene 19 puntos mas a la derecha que la anterior. Malla de tamaño 71.
+B<-30
 
 # Familia de ventanas H candidatas
 u <- seq(0, floor(log(n))*(2/3), by = 0.1)

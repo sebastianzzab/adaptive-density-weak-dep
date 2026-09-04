@@ -1,5 +1,5 @@
 # KDE: MÉTODOS CLÁSICOS DE SELECCIÓN DEL PARÁMETRO VENTANA (h) EN R
-# Link: https://rubenfcasal.github.io/book_remuestreo/npden-r.html?utm_source=chatgpt.com
+# Link: https://rubenfcasal.github.io/book_remuestreo/npden-r.html
 # =========================================================================================================================
 # R tiene varias funciones para seleccionar automáticamente el ancho de banda (h) para la estimación de densidad por núcleo.
 # bw.nrd0, bw.nrd, bw.ucv, bw.bcv y bw.SJ son métodos predefinidos que implementan diferentes enfoques para seleccionar h.

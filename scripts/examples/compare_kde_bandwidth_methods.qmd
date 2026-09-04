@@ -1,0 +1,107 @@
+---
+title: "MÉTODOS CLÁSICOS DE SELECCIÓN DEL ANCHO DE VENTANA (h) EN R"
+format: html
+editor: visual
+---
+
+## Selección de Ancho de Ventana para Estimación de Densidad
+<div class=text-justify>
+En este documento se señalan cuales son los métodos de selección del ancho de ventana por defecto en R. Si desean obtener más información sobre este tema, pueden consultarlo en la documentación sobre [estimación de densidad no paramétrica en R](https://rubenfcasal.github.io/book_remuestreo/npden-r.html).
+
+R cuenta con varias funciones predefinidas que implementan diferentes enfoques para seleccionar automáticamente el ancho de ventana ($h$) en la estimación de densidad por núcleo:
+
+* **`bw.nrd0`**: Implementa una regla práctica para elegir el ancho de ventana de un estimador de densidad de núcleo gaussiano. Por defecto, es $0.9$ veces el mínimo de la desviación estándar y el rango intercuartil dividido por $1.34$ veces el tamaño de la muestra elevado a la potencia de $-1/5$ (la "regla práctica" de Silverman, 1986, pág. 48, ecuación 3.31). A menos que los cuartiles coinciden, en cuyo caso se garantiza un resultado positivo.
+* **`bw.nrd`**: Es la variante más común propuesta por Scott (1992), utilizando un factor de $1.06$.
+* **`bw.ucv` y `bw.bcv`**: Implementan la validación cruzada insesgada y sesgada, respectivamente.
+* **`bw.SJ`**: Implementa los métodos de Sheather y Jones (1991) para seleccionar el ancho de ventana mediante la estimación piloto de derivadas.
+
+::: {.callout-note}
+## Detalles Algorítmicos y Computacionales
+
+* **Método "ste":** El algoritmo resuelve una ecuación (mediante la búsqueda de raíces) y, por ello, amplía el intervalo `c(inferior, superior)` cuando los límites no han sido especificados por el usuario y no incluyen la raíz.
+* **Complejidad Computacional:** Los últimos tres métodos utilizan distancias agrupadas por pares. Su complejidad es $\mathcal{O}(n^2)$ hasta $n = n_b/2$, y $\mathcal{O}(n)$ a partir de entonces. Debido a este agrupamiento, los resultados pueden diferir ligeramente cuando la variable $x$ se traslada o cambia de signo.
+:::
+
+Para comparar la estimación resultante utilizando cada uno de estos métodos de selección del ancho de ventana, se va a utilizar el conjunto de datos de R base de las precipitaciones anuales en ciertas ciudades estadounidenses.
+
+```{r}
+# Definiendo el objeto con mis datos
+precipitaciones <- precip
+datos <- data.frame(precipitaciones)
+
+# Seleccionando h bajo distintos métodos
+h1 <- bw.SJ(datos$precipitaciones) # Sheather y Jones (1991)
+h2 <- bw.nrd0(datos$precipitaciones) # Silverman(1986)
+h3 <- bw.nrd(datos$precipitaciones)  # Scott(1992)
+h4 <- bw.ucv(datos$precipitaciones)  # CV insesgada
+h5 <- bw.bcv(datos$precipitaciones)  # CV sesgada  #OBSERVACIÓN: In bw.bcv(x) : minimum occurred at one end of the range
+
+# Ajustando las densidades para los distintos h obtenidos:
+npden1 <- density(datos$precipitaciones, bw = h1) # h = 3.931768
+npden2 <- density(datos$precipitaciones, bw = h2) # h = 3.847892
+npden3 <- density(datos$precipitaciones, bw = h3) # h = 4.531962
+npden4 <- density(datos$precipitaciones, bw = h4) # h = 4.861868
+npden5 <- density(datos$precipitaciones, bw = h5) # h = 6.680812
+
+```
+
+```{r}
+library(ggplot2)
+# Histograma con densidad
+ggplot(datos, aes(x = precipitaciones)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "gray") +
+  geom_density(
+    lwd = 1, 
+    colour = "blue",
+    alpha = 0.25,
+    bw = "SJ") +
+  geom_density(
+    lwd = 1,
+    colour = "red",
+    alpha = 0.25,
+    bw = "nrd0") +
+  geom_density(
+    lwd = 1,
+    colour = "green",
+    alpha = 0.25,
+    bw = "nrd") +
+  geom_density(
+    lwd = 1,
+    colour = "purple",
+    alpha = 0.25,
+    bw = "ucv") +
+  geom_density(
+    lwd = 1,
+    colour = "orange",
+    alpha = 0.25,
+    bw = "bcv") +
+  ggtitle("Gráfico densidad kernel") +
+  theme_bw()
+
+```
+
+```{r}
+# hist(x, freq = FALSE, main = "Comparación de métodos clásicos para seleccionar h",
+#      xlab = "Valores de x", ylab = "Densidad",
+#      #xlab = paste("Bandwidth =", formatC(c(h1,h2,h3,h4,h5))), lty = 2,
+#      border = "darkgray", xlim = c(0, 80), ylim = c(0, 0.04))
+# #lines(c(npden1,npden2, npden3, npden4, npden5), lwd = 2)
+# lines(npden1, lwd = 2, col = "blue")
+# lines(npden2, lwd = 2, col = "red")
+# lines(npden3, lwd = 2, col = "green")
+# lines(npden4, lwd = 2, col = "darkblue")
+# lines(npden5, lwd = 2, col = "darkgreen")
+# rug(x, col = "darkgray")
+# 
+# # Añadir leyenda
+# legend("topright", 
+#        legend = c("SJ", "Silverman", "Scott", "UCV", "BCV"), 
+#        col = c("blue", "red", "green","darkblue", "darkgreen"), 
+#        lwd = 2, 
+#        bty = "n", # Sin caja alrededor de la leyenda
+#        cex = 0.9)
+```
+
+
+</div>
