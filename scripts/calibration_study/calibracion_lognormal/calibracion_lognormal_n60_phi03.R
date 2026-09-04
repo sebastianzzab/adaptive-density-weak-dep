@@ -15,7 +15,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 ###########################################################
 n <- 60           # Tamaño de la muestra
 phi <- 0.3         # Coeficiente de autocorrelación AR(1)
-B <- 300           # Iteraciones de Monte Carlo
+B <- 1000           # Iteraciones de Monte Carlo
 
 # Selector dinámico de densidad
 densidad <- "lognormal" 
@@ -262,7 +262,7 @@ Resultados <- list(GAM = GAM,MISE = MISE, GAM_OPT = gamma_optimo,
 if(n == 60 & phi==0) {
   save(Resultados,file = "Resultados_Lognormal_n60_phi0.RData")
 } else if(n == 60 & phi==0.3) {
-  save(Resultados,file = "Resultados_Lognormal_n60_phi03.RData")
+  save(Resultados,file = "Resultados_Lognormal2_n60_phi03.RData")
 } else if(n == 60 & phi==0.5) {
   save(Resultados,file = "Resultados_Lognormal_n60_phi05.RData")
 } else if(n == 60 & phi==0.7) {

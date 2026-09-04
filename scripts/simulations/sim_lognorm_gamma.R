@@ -114,17 +114,60 @@ generar_muestra <- function(n, phi, tipo, mw_idx = 1, a = -2, b = 2, me = 0, de 
   return(list(X = X, gsup = gsup, y_teo_func = y_teo_func, lim_inf = lim_inf, lim_sup = lim_sup))
 }
 
+# =====================================================================
+# OBTENCIÓN DE PUNTOS CRÍTICOS TEÓRICOS PARA MSE(x)
+# =====================================================================
+
 obtener_puntos_evaluacion <- function(tipo, mw_idx = 1, me = 0, de = 1) {
-  nombres <- c("Moda", "P05", "Q1", "Mediana", "Q3", "P95"); pts <- numeric(6)
-  if (tipo == "normal") { pts[1] <- me; pts[2:6] <- qnorm(c(0.05, 0.25, 0.50, 0.75, 0.95), mean = me, sd = de)
-  } else if (tipo == "lognormal") { pts[1] <- exp(0 - 0.5^2); pts[2:6] <- qlnorm(c(0.05, 0.25, 0.50, 0.75, 0.95), meanlog = 0, sdlog = 0.5)
-  } else if (tipo == "logistica") { s <- sqrt(3) / pi; pts[1] <- 3; pts[2:6] <- qlogis(c(0.05, 0.25, 0.50, 0.75, 0.95), location = 3, scale = s)
-  } else if (tipo == "laplace") { b_param <- 1 / sqrt(2); pts[1] <- 3; q_laplace <- function(p, m, b) { ifelse(p < 0.5, m + b * log(2 * p), m - b * log(2 * (1 - p))) }; pts[2:6] <- q_laplace(c(0.05, 0.25, 0.50, 0.75, 0.95), m = 3, b = b_param)
-  } else if (tipo == "gamma") { media_ln <- exp(0.125); var_ln <- (exp(0.25) - 1) * exp(0.25); shape_g <- (media_ln^2) / var_ln; rate_g <- media_ln / var_ln; pts[1] <- (shape_g - 1) / rate_g; pts[2:6] <- qgamma(c(0.05, 0.25, 0.50, 0.75, 0.95), shape = shape_g, rate = rate_g)
-  } else if (tipo == "weibull") { shape_w <- 1.5; media_ln <- exp(0.125); scale_w <- media_ln / gamma(1 + 1/shape_w); pts[1] <- scale_w * ((shape_w - 1)/shape_w)^(1/shape_w); pts[2:6] <- qweibull(c(0.05, 0.25, 0.50, 0.75, 0.95), shape = shape_w, scale = scale_w)
-  } else if (tipo == "mezcla") { pts[1] <- 2; pts[2:6] <- QMix(c(0.05, 0.25, 0.50, 0.75, 0.95))
-  } else if (tipo == "mw") { mw_obj <- mw_list[[mw_idx]]; opt <- optimize(function(x) dnorMix(x, mw_obj), interval = c(-5, 5), maximum = TRUE); pts[1] <- opt$maximum; pts[2:6] <- qnorMix(c(0.05, 0.25, 0.50, 0.75, 0.95), mw_obj) }
-  names(pts) <- nombres; return(pts)
+  pts <- numeric(6)
+  
+  # 1. Caso Unimodal (Lógica clásica)
+  if (tipo %in% c("normal", "lognormal", "logistica", "laplace", "gamma", "weibull")) {
+    nombres <- c("P05", "Q1", "Mediana", "Moda", "Q3", "P95")
+    
+    if (tipo == "normal") {
+      pts[4] <- me
+      pts[c(1,2,3,5,6)] <- qnorm(c(0.05, 0.25, 0.50, 0.75, 0.95), mean = me, sd = de)
+    } else if (tipo == "laplace") {
+      b_param <- 1 / sqrt(2)
+      pts[4] <- 3
+      q_laplace <- function(p, m, b) { ifelse(p < 0.5, m + b * log(2 * p), m - b * log(2 * (1 - p))) }
+      pts[c(1,2,3,5,6)] <- q_laplace(c(0.05, 0.25, 0.50, 0.75, 0.95), m = 3, b = b_param)
+    } else if (tipo == "lognormal") {
+      pts[4] <- exp(0 - 0.5^2)
+      pts[c(1,2,3,5,6)] <- qlnorm(c(0.05, 0.25, 0.50, 0.75, 0.95), meanlog = 0, sdlog = 0.5)
+    } else if (tipo == "gamma") {
+      media_ln <- exp(0.125); var_ln <- (exp(0.25) - 1) * exp(0.25)
+      shape_g <- (media_ln^2) / var_ln; rate_g <- media_ln / var_ln
+      pts[4] <- (shape_g - 1) / rate_g
+      pts[c(1,2,3,5,6)] <- qgamma(c(0.05, 0.25, 0.50, 0.75, 0.95), shape = shape_g, rate = rate_g)
+    }
+    
+    # 2. Caso Multimodal: Mezcla Bimodal
+  } else if (tipo == "mezcla") {
+    nombres <- c("P05", "Moda_Izq", "Valle_Central", "Moda_Der", "Q3", "P95")
+    pts[1] <- QMix(0.05)
+    pts[2] <- -2           # Primera moda
+    pts[3] <- 0            # Valle central (Antimoda)
+    pts[4] <- 2            # Segunda moda
+    pts[5] <- QMix(0.75)
+    pts[6] <- QMix(0.95)
+    
+    # 3. Caso Multimodal: Modelo 10 (Garra)
+  } else if (tipo == "mw") {
+    # La Garra tiene 5 picos ubicados en j/2 - 1 para j = 0,1,2,3,4
+    nombres <- c("Garra_1", "Garra_2", "Garra_3", "Garra_4", "Garra_5", "P95")
+    pts[1] <- -1           # Pico 1
+    pts[2] <- -0.5         # Pico 2
+    pts[3] <- 0            # Pico 3 (Central)
+    pts[4] <- 0.5          # Pico 4
+    pts[5] <- 1            # Pico 5
+    mw_obj <- mw_list[[mw_idx]]
+    pts[6] <- qnorMix(0.95, mw_obj)
+  }
+  
+  names(pts) <- nombres
+  return(pts)
 }
 
 # =====================================================================
